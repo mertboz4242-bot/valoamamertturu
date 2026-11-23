@@ -1,0 +1,3705 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DUST: SECTOR ZERO // VALORANT PROTOCOL</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0d0f12;
+      color: #f0f4f8;
+    }
+
+    #game-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    #damage-overlay, #skill-tint {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      transition: box-shadow 0.15s ease-out, background 0.2s ease-out;
+    }
+
+    #scope-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 8;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s ease-out;
+      background: radial-gradient(circle at center, transparent 18%, rgba(4, 8, 14, 0.52) 44%, rgba(0, 0, 0, 0.96) 76%);
+    }
+
+    #scope-overlay.active {
+      opacity: 1;
+    }
+
+    .scope-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 310px;
+      height: 310px;
+      transform: translate(-50%, -50%);
+      border: 2px solid rgba(56, 189, 248, 0.55);
+      border-radius: 50%;
+      box-shadow: 0 0 28px rgba(0, 0, 0, 0.85), inset 0 0 24px rgba(56, 189, 248, 0.12);
+    }
+
+    .scope-ring-inner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 120px;
+      height: 120px;
+      transform: translate(-50%, -50%);
+      border: 1px dashed rgba(255, 255, 255, 0.35);
+      border-radius: 50%;
+    }
+
+    .scope-center-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 6px;
+      height: 6px;
+      margin: -3px 0 0 -3px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+    }
+
+    .scope-line-h {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.65) 42%, transparent 48%, transparent 52%, rgba(255,255,255,0.65) 58%, rgba(255,255,255,0.22) 100%);
+    }
+
+    .scope-line-v {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.65) 42%, transparent 48%, transparent 52%, rgba(255,255,255,0.65) 58%, rgba(255,255,255,0.22) 100%);
+    }
+
+    #scope-meta {
+      position: absolute;
+      top: calc(50% + 168px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 15, 22, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #7dd3fc;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1.4px;
+      padding: 3px 10px;
+      border-radius: 3px;
+    }
+
+    #hud {
+      position: fixed;
+      inset: 0;
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    #minimap-box {
+      position: absolute;
+      top: 16px;
+      left: 18px;
+      width: 176px;
+      background: rgba(12, 16, 23, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 6px;
+      padding: 8px;
+      backdrop-filter: blur(5px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    #minimap-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+
+    #minimap-header span.site-tag {
+      color: #fbbf24;
+    }
+
+    #minimap-canvas {
+      display: block;
+      width: 160px;
+      height: 160px;
+      border-radius: 4px;
+      background: #141b24;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #minimap-legend {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 9px;
+      font-weight: 700;
+      color: #cbd5e1;
+    }
+
+    .mm-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+
+    #top-bar {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      background: rgba(15, 19, 25, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 4px;
+      backdrop-filter: blur(4px);
+      overflow: hidden;
+    }
+
+    .team-score {
+      padding: 8px 16px;
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: 1px;
+    }
+
+    .team-score.ct {
+      background: rgba(59, 130, 246, 0.25);
+      color: #60a5fa;
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .team-score.t {
+      background: rgba(245, 158, 11, 0.25);
+      color: #fbbf24;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #round-info {
+      padding: 6px 20px;
+      text-align: center;
+    }
+
+    #round-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 1.5px;
+    }
+
+    #map-badge-text {
+      color: #38bdf8;
+      font-weight: 900;
+    }
+
+    #enemies-left {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f87171;
+      margin-top: 2px;
+    }
+
+    #lineup-bar {
+      position: absolute;
+      top: 68px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      background: rgba(10, 14, 20, 0.65);
+      padding: 5px 8px;
+      border-radius: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .agent-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(18, 24, 34, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.7px;
+      color: #f8fafc;
+      transition: opacity 0.2s, transform 0.2s, background 0.2s;
+    }
+
+    .agent-chip .chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .agent-chip .chip-state {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 2px;
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .agent-chip.dead {
+      opacity: 0.42;
+      background: rgba(30, 15, 18, 0.85);
+      border-color: rgba(239, 68, 68, 0.35) !important;
+      color: #94a3b8;
+    }
+
+    .agent-chip.dead .chip-name {
+      text-decoration: line-through;
+    }
+
+    .agent-chip.dead .chip-state {
+      background: rgba(239, 68, 68, 0.25);
+      color: #f87171;
+    }
+
+    #weapon-hotbar {
+      position: absolute;
+      top: 108px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+    }
+
+    .wpn-slot-chip {
+      background: rgba(15, 19, 25, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 4px 12px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #94a3b8;
+      letter-spacing: 0.6px;
+    }
+
+    .wpn-slot-chip.active {
+      background: rgba(251, 191, 36, 0.22);
+      border-color: #fbbf24;
+      color: #fbbf24;
+    }
+
+    #crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      z-index: 18;
+      pointer-events: none;
+      display: block;
+      opacity: 1;
+    }
+
+    .ch-line {
+      position: absolute;
+      background: #00ff33;
+      box-shadow: 0 0 0 1px #000000;
+    }
+
+    #ch-top    { width: 2px; height: 8px; left: -1px; bottom: 5px; }
+    #ch-bottom { width: 2px; height: 8px; left: -1px; top: 5px; }
+    #ch-left   { width: 8px; height: 2px; top: -1px; right: 5px; }
+    #ch-right  { width: 8px; height: 2px; top: -1px; left: 5px; }
+
+    #ch-dot {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      left: -1px;
+      top: -1px;
+      background: #00ff33;
+      box-shadow: 0 0 0 1px #000000;
+      display: none;
+    }
+
+    #hitmarker {
+      position: absolute;
+      opacity: 0;
+      transition: opacity 0.08s ease-out;
+    }
+
+    #hitmarker.active {
+      opacity: 1;
+    }
+
+    #hitmarker.headshot .hm-line {
+      background: #ef4444;
+    }
+
+    .hm-line {
+      position: absolute;
+      width: 2px;
+      height: 8px;
+      background: #ffffff;
+      box-shadow: 0 0 3px #000;
+      transform-origin: center;
+    }
+
+    .hm-1 { transform: translate(-7px, -10px) rotate(-45deg); }
+    .hm-2 { transform: translate(5px, -10px) rotate(45deg); }
+    .hm-3 { transform: translate(-7px, 2px) rotate(45deg); }
+    .hm-4 { transform: translate(5px, 2px) rotate(-45deg); }
+
+    #killfeed {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+
+    .kill-entry {
+      background: rgba(15, 19, 25, 0.85);
+      border-left: 3px solid #3b82f6;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border-radius: 2px;
+      animation: fadeSlide 0.2s ease-out;
+    }
+
+    .kill-entry span.hs {
+      color: #ef4444;
+      margin: 0 4px;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateX(12px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    #center-banner {
+      position: absolute;
+      top: 32%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15, 19, 25, 0.92);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      padding: 11px 26px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    #bottom-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    #vitals {
+      display: flex;
+      gap: 10px;
+    }
+
+    .vital-box {
+      background: rgba(15, 19, 25, 0.85);
+      border-bottom: 3px solid #22c55e;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 22px;
+      font-weight: 800;
+      border-radius: 3px;
+    }
+
+    .vital-box.armor {
+      border-bottom-color: #3b82f6;
+    }
+
+    .vital-box.credits {
+      border-bottom-color: #eab308;
+      color: #fde047;
+    }
+
+    .vital-box.low-hp {
+      border-bottom-color: #ef4444;
+      color: #f87171;
+    }
+
+    .vital-icon {
+      font-size: 15px;
+      opacity: 0.85;
+    }
+
+    #ability-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(15, 19, 25, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 8px 14px;
+      border-radius: 4px;
+    }
+
+    .ability-slot {
+      text-align: center;
+      min-width: 92px;
+      padding: 4px 8px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.05);
+      border-bottom: 2px solid #22c55e;
+    }
+
+    .ability-slot.cooldown {
+      opacity: 0.55;
+      border-bottom-color: #64748b;
+    }
+
+    .key-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 900;
+      background: #fbbf24;
+      color: #0f172a;
+      padding: 1px 6px;
+      border-radius: 2px;
+      margin-bottom: 3px;
+    }
+
+    .ability-name {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+    }
+
+    .ability-cd {
+      font-size: 10px;
+      font-weight: 700;
+      color: #4ade80;
+      margin-top: 2px;
+    }
+
+    .ability-slot.cooldown .ability-cd {
+      color: #94a3b8;
+    }
+
+    .ability-center {
+      padding: 0 8px;
+      border-left: 1px solid rgba(255, 255, 255, 0.12);
+      border-right: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    #player-agent-tag {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      color: #fbbf24;
+    }
+
+    #weapon-panel {
+      background: rgba(14, 19, 27, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-bottom: 3px solid #f59e0b;
+      padding: 10px 18px;
+      min-width: 245px;
+      text-align: right;
+      border-radius: 5px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    #weapon-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #weapon-dmg-badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: rgba(251, 191, 36, 0.14);
+      color: #fde047;
+    }
+
+    #weapon-name {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 1.1px;
+      color: #fbbf24;
+    }
+
+    #weapon-silhouette {
+      height: 18px;
+      margin: 6px 0 2px auto;
+      width: 120px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, rgba(251,191,36,0.12) 0%, rgba(251,191,36,0.55) 75%, rgba(255,255,255,0.85) 100%);
+      position: relative;
+    }
+
+    #weapon-silhouette::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 12px;
+      height: 6px;
+      background: #fbbf24;
+      border-radius: 1px;
+    }
+
+    #weapon-mode {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 0.8px;
+      margin-top: 2px;
+    }
+
+    #ammo-display {
+      font-size: 28px;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-top: 4px;
+    }
+
+    .ammo-sep {
+      font-size: 18px;
+      color: #64748b;
+      margin: 0 3px;
+    }
+
+    #ammo-res {
+      font-size: 18px;
+      color: #94a3b8;
+    }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: radial-gradient(circle at center, rgba(15, 20, 28, 0.86), rgba(8, 10, 14, 0.97));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(6px);
+    }
+
+    .menu-card {
+      background: rgba(20, 26, 35, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 22px 28px;
+      max-width: 680px;
+      width: 94%;
+      border-radius: 6px;
+      text-align: center;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+      max-height: 94vh;
+      overflow-y: auto;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #fbbf24;
+      background: rgba(245, 158, 11, 0.15);
+      padding: 4px 10px;
+      border-radius: 3px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.4;
+      margin-bottom: 12px;
+      min-height: 36px;
+    }
+
+    #map-pool-box {
+      background: rgba(10, 14, 20, 0.65);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+    }
+
+    #map-pool-title {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: #7dd3fc;
+      margin-bottom: 6px;
+    }
+
+    #map-pool-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      justify-content: center;
+    }
+
+    .map-pool-pill {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.07);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #agent-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .agent-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      border-radius: 5px;
+      padding: 10px 6px;
+      cursor: pointer;
+      transition: transform 0.12s, border-color 0.15s, background 0.15s;
+    }
+
+    .agent-card:hover {
+      transform: translateY(-2px);
+      background: rgba(30, 41, 59, 0.95);
+    }
+
+    .agent-card.selected {
+      background: rgba(30, 41, 59, 1);
+      box-shadow: 0 0 16px rgba(251, 191, 36, 0.25);
+    }
+
+    .agent-card-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      margin: 0 auto 6px;
+    }
+
+    .agent-card-name {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+
+    .agent-card-role {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      text-align: left;
+      background: rgba(10, 14, 20, 0.6);
+      padding: 12px 14px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+
+    .controls-grid span {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      margin-right: 6px;
+      text-align: center;
+    }
+
+    .primary-btn {
+      width: 100%;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      color: #0f172a;
+      background: #fbbf24;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: transform 0.1s, background 0.15s;
+    }
+
+    .primary-btn:hover {
+      background: #f59e0b;
+      transform: translateY(-1px);
+    }
+
+    .secondary-btn {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .secondary-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    #lock-hint {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    #pause-modal, #shop-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 25;
+      background: rgba(7, 10, 15, 0.88);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+
+    .panel-box {
+      background: #141a24;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 6px;
+      padding: 20px 24px;
+      width: 94%;
+      max-width: 680px;
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      color: #fbbf24;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sens-row {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 10px 14px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+    }
+
+    .sens-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #fbbf24;
+      cursor: pointer;
+    }
+
+    #crosshair-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .xh-tile {
+      height: 82px;
+      background: #6b4432;
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      border-radius: 4px;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .xh-tile:hover {
+      border-color: #cbd5e1;
+    }
+
+    .xh-tile.selected {
+      border-color: #fbbf24;
+      box-shadow: 0 0 12px rgba(251, 191, 36, 0.45);
+    }
+
+    .xh-preview-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+    }
+
+    .xh-prev-part {
+      position: absolute;
+    }
+
+    .shop-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .shop-section-title {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 4px;
+    }
+
+    .shop-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+
+    .shop-item:hover {
+      border-color: #fbbf24;
+      background: rgba(251, 191, 36, 0.08);
+    }
+
+    .shop-item.owned {
+      border-color: #22c55e;
+    }
+
+    .shop-item-name {
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .shop-item-sub {
+      font-size: 10px;
+      color: #94a3b8;
+    }
+
+    .shop-price {
+      font-size: 12px;
+      font-weight: 900;
+      color: #fde047;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+  <div id="damage-overlay"></div>
+  <div id="skill-tint"></div>
+
+  <div id="scope-overlay">
+    <div class="scope-ring"></div>
+    <div class="scope-ring-inner"></div>
+    <div class="scope-center-dot"></div>
+    <div class="scope-line-h"></div>
+    <div class="scope-line-v"></div>
+    <div id="scope-meta">OPTIC ZOOM • RMB KAPAT</div>
+  </div>
+
+  <div id="hud" class="hidden">
+    <div id="minimap-box">
+      <div id="minimap-header">
+        <span>RADAR // MAP</span>
+        <span class="site-tag" id="mm-map-code">HV-ABC</span>
+      </div>
+      <canvas id="minimap-canvas" width="160" height="160"></canvas>
+      <div id="minimap-legend">
+        <div><span class="mm-dot" style="background:#38bdf8;"></span>SEN</div>
+        <div><span class="mm-dot" style="background:#ef4444;"></span>AJAN</div>
+      </div>
+    </div>
+
+    <div id="top-bar">
+      <div class="team-score ct">CT <span id="ct-score">0</span></div>
+      <div id="round-info">
+        <div id="round-label">MAP: <span id="map-badge-text">HAVEN</span> • R<span id="round-num">1</span></div>
+        <div id="enemies-left">HOSTILES: <span id="enemy-count">5</span></div>
+      </div>
+      <div class="team-score t"><span id="t-score">0</span> T</div>
+    </div>
+
+    <div id="lineup-bar"></div>
+
+    <div id="weapon-hotbar">
+      <div class="wpn-slot-chip active" id="slot-chip-1">[1] CLASSIC</div>
+      <div class="wpn-slot-chip" id="slot-chip-2">[2] BOŞ</div>
+      <div class="wpn-slot-chip" id="slot-chip-3">[3] BIÇAK</div>
+    </div>
+
+    <div id="crosshair">
+      <div class="ch-line" id="ch-top"></div>
+      <div class="ch-line" id="ch-bottom"></div>
+      <div class="ch-line" id="ch-left"></div>
+      <div class="ch-line" id="ch-right"></div>
+      <div id="ch-dot"></div>
+      <div id="hitmarker">
+        <div class="hm-line hm-1"></div>
+        <div class="hm-line hm-2"></div>
+        <div class="hm-line hm-3"></div>
+        <div class="hm-line hm-4"></div>
+      </div>
+    </div>
+
+    <div id="killfeed"></div>
+    <div id="center-banner" class="hidden"></div>
+
+    <div id="bottom-bar">
+      <div id="vitals">
+        <div class="vital-box">
+          <span class="vital-icon">+</span>
+          <span id="hp-val">100</span>
+        </div>
+        <div class="vital-box armor">
+          <span class="vital-icon">🛡</span>
+          <span id="armor-val">0</span>
+        </div>
+        <div class="vital-box credits">
+          <span class="vital-icon">¤</span>
+          <span id="credits-val">800</span>
+        </div>
+      </div>
+
+      <div id="ability-bar">
+        <div class="ability-slot" id="slot-q">
+          <div class="key-badge">Q</div>
+          <div class="ability-name" id="name-q">UPDRAFT</div>
+          <div class="ability-cd" id="cd-q">READY</div>
+        </div>
+        <div class="ability-center">
+          <div id="player-agent-tag">JETT</div>
+        </div>
+        <div class="ability-slot" id="slot-e">
+          <div class="key-badge">E</div>
+          <div class="ability-name" id="name-e">TAILWIND</div>
+          <div class="ability-cd" id="cd-e">READY</div>
+        </div>
+      </div>
+
+      <div id="weapon-panel">
+        <div id="weapon-top-row">
+          <span id="weapon-dmg-badge">DMG 26 / 78</span>
+          <span id="weapon-name">CLASSIC</span>
+        </div>
+        <div id="weapon-silhouette"></div>
+        <div id="weapon-mode">SEMI • RMB DÜRBÜN • B MARKET</div>
+        <div id="ammo-display">
+          <span id="ammo-mag">12</span>
+          <span class="ammo-sep">/</span>
+          <span id="ammo-res">36</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pause-modal" class="hidden">
+    <div class="panel-box">
+      <div class="panel-title">
+        <span>OYUN DURAKLATILDI // AYARLAR</span>
+        <span style="font-size:11px;color:#94a3b8;">ESC</span>
+      </div>
+
+      <div class="sens-row">
+        <div class="sens-header">
+          <span>FARE HASSASİYETİ</span>
+          <span id="sens-val">1.00</span>
+        </div>
+        <input type="range" id="sens-slider" min="0.2" max="3.0" step="0.05" value="1.0" />
+      </div>
+
+      <div class="shop-section-title">NİŞANGÂH SEÇİMİ</div>
+      <div id="crosshair-grid"></div>
+
+      <button class="primary-btn" id="resume-btn">OYUNA DEVAM ET</button>
+      <button class="secondary-btn" id="agent-menu-btn">AJAN SEÇİM EKRANINA DÖN</button>
+    </div>
+  </div>
+
+  <div id="shop-modal" class="hidden">
+    <div class="panel-box">
+      <div class="panel-title">
+        <span>SİLAH MARKETİ [B]</span>
+        <span style="color:#fde047;">¤ <span id="shop-credits">800</span></span>
+      </div>
+
+      <div class="shop-cols">
+        <div>
+          <div class="shop-section-title">1 — TABANCALAR</div>
+          <div id="shop-pistols"></div>
+          <div class="shop-section-title" style="margin-top:10px;">ZIRH</div>
+          <div id="shop-armors"></div>
+        </div>
+        <div>
+          <div class="shop-section-title">2 — AĞIR SİLAHLAR</div>
+          <div id="shop-primaries"></div>
+        </div>
+      </div>
+
+      <button class="primary-btn" id="close-shop-btn">MARKETİ KAPAT & DEVAM ET [B]</button>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <div class="menu-card">
+      <div class="badge">RANDOM MAP POOL // VALORANT PROTOCOL</div>
+      <h1>AJANINI SEÇ</h1>
+      <p class="subtitle" id="selected-agent-desc">JETT — Rüzgar çevikliği (Q: Updraft ile havaya sıçra • E: Tailwind ile ileri atıl)</p>
+
+      <div id="map-pool-box">
+        <div id="map-pool-title">MAÇA GİRİNCE RASTGELE SEÇİLECEK 11 HARİTA</div>
+        <div id="map-pool-list"></div>
+      </div>
+
+      <div id="agent-grid"></div>
+
+      <div class="controls-grid">
+        <div><span>1 / 2 / 3</span> Tabanca / Ağır / Bıçak</div>
+        <div><span>B</span> Silah Marketi</div>
+        <div><span>RMB</span> Dürbün Aç / Kapat</div>
+        <div><span>ESC</span> Duraklat & Ayarlar</div>
+      </div>
+
+      <button class="primary-btn" id="start-btn">LOCK IN & DEPLOY RANDOM MAP (JETT)</button>
+      <p id="lock-hint">WASD yürütür • Mouse etrafa çevirir • Her kill +200 kredi</p>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    var overlayEl = document.getElementById('overlay');
+    var pauseModalEl = document.getElementById('pause-modal');
+    var shopModalEl = document.getElementById('shop-modal');
+    var hudEl = document.getElementById('hud');
+    var startBtn = document.getElementById('start-btn');
+
+    function ensureHudAndCrosshairVisible() {
+      if (hudEl) {
+        hudEl.classList.remove('hidden');
+        hudEl.style.display = 'block';
+      }
+      if (crosshairEl) {
+        crosshairEl.style.display = 'block';
+        crosshairEl.style.opacity = state.isScoped ? '0.2' : '1';
+      }
+    }
+
+    function forceCloseOverlay() {
+      if (overlayEl) {
+        overlayEl.classList.add('hidden');
+        overlayEl.style.display = 'none';
+      }
+      ensureHudAndCrosshairVisible();
+    }
+
+    var AudioFX = {
+      ctx: null,
+      init: function () {
+        try {
+          if (!this.ctx) {
+            var AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.ctx = new AudioCtx();
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+        } catch (e) {}
+      },
+      playShot: function (isPlayer, pitchMult, heavy) {
+        if (isPlayer === undefined) isPlayer = true;
+        if (!pitchMult) pitchMult = 1;
+        if (!this.ctx) return;
+        var now = this.ctx.currentTime;
+
+        var dur = heavy ? 0.24 : 0.13;
+        var bufferSize = Math.floor(this.ctx.sampleRate * dur);
+        var buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        var data = buffer.getChannelData(0);
+        for (var i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * (heavy ? 0.06 : 0.03)));
+        }
+
+        var noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        var filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime((isPlayer ? 1100 : 800) * pitchMult, now);
+        filter.Q.value = heavy ? 0.55 : 0.8;
+
+        var gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(isPlayer ? (heavy ? 0.48 : 0.35) : 0.16, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(now);
+
+        var osc = this.ctx.createOscillator();
+        var oscGain = this.ctx.createGain();
+        osc.type = heavy ? 'sawtooth' : 'triangle';
+        osc.frequency.setValueAtTime((isPlayer ? 160 : 120) * pitchMult, now);
+        osc.frequency.exponentialRampToValueAtTime(34, now + (heavy ? 0.16 : 0.09));
+
+        oscGain.gain.setValueAtTime(isPlayer ? 0.32 : 0.12, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + (heavy ? 0.16 : 0.09));
+
+        osc.connect(oscGain);
+        oscGain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + (heavy ? 0.16 : 0.09));
+      },
+      playKnife: function () {
+        if (!this.ctx) return;
+        var now = this.ctx.currentTime;
+        var osc = this.ctx.createOscillator();
+        var gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(920, now);
+        osc.frequency.exponentialRampToValueAtTime(240, now + 0.09);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      },
+      playHit: function (isHeadshot) {
+        if (isHeadshot === undefined) isHeadshot = false;
+        if (!this.ctx) return;
+        var now = this.ctx.currentTime;
+        var osc = this.ctx.createOscillator();
+        var gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(isHeadshot ? 1450 : 720, now);
+        osc.frequency.exponentialRampToValueAtTime(isHeadshot ? 2100 : 420, now + 0.06);
+
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.06);
+      },
+      playReload: function () {
+        if (!this.ctx) return;
+        var now = this.ctx.currentTime;
+        [0, 0.65].forEach(function (offset, idx) {
+          var osc = AudioFX.ctx.createOscillator();
+          var gain = AudioFX.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(idx === 0 ? 320 : 520, now + offset);
+          gain.gain.setValueAtTime(0.08, now + offset);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.06);
+          osc.connect(gain);
+          gain.connect(AudioFX.ctx.destination);
+          osc.start(now + offset);
+          osc.stop(now + offset + 0.06);
+        });
+      },
+      playScope: function (zoomIn) {
+        if (!this.ctx) return;
+        var now = this.ctx.currentTime;
+        var osc = this.ctx.createOscillator();
+        var gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(zoomIn ? 480 : 620, now);
+        osc.frequency.exponentialRampToValueAtTime(zoomIn ? 660 : 420, now + 0.05);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      },
+      playSkill: function (freq) {
+        if (!this.ctx) return;
+        var now = this.ctx.currentTime;
+        var osc = this.ctx.createOscillator();
+        var gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq || 420, now);
+        osc.frequency.exponentialRampToValueAtTime((freq || 420) * 1.65, now + 0.18);
+        gain.gain.setValueAtTime(0.13, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.18);
+      },
+      playBuy: function () {
+        if (!this.ctx) return;
+        var now = this.ctx.currentTime;
+        var osc = this.ctx.createOscillator();
+        var gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(580, now);
+        osc.frequency.setValueAtTime(880, now + 0.06);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.14);
+      }
+    };
+
+    var CROSSHAIR_PRESETS = [
+      { id: 'xh0', color: '#00ff33', outline: '#000000', thickness: 2, len: 8, gap: 5, dot: false, dotSize: 0 },
+      { id: 'xh1', color: '#e2e8f0', outline: '#000000', thickness: 1, len: 5, gap: 7, dot: true,  dotSize: 2 },
+      { id: 'xh2', color: '#ffffff', outline: '#000000', thickness: 2, len: 6, gap: 5, dot: false, dotSize: 0 },
+      { id: 'xh3', color: '#ef4444', outline: '#000000', thickness: 2, len: 6, gap: 5, dot: false, dotSize: 0 },
+      { id: 'xh4', color: '#ff00ff', outline: 'transparent', thickness: 2, len: 5, gap: 4, dot: false, dotSize: 0 },
+      { id: 'xh5', color: '#00f0ff', outline: '#000000', thickness: 3, len: 9, gap: 6, dot: false, dotSize: 0 },
+      { id: 'xh6', color: '#cbd5e1', outline: '#000000', thickness: 2, len: 6, gap: 5, dot: false, dotSize: 0 },
+      { id: 'xh7', color: '#ffffff', outline: '#000000', thickness: 1, len: 0, gap: 0, dot: true,  dotSize: 5 },
+      { id: 'xh8', color: '#facc15', outline: '#000000', thickness: 1, len: 0, gap: 0, dot: true,  dotSize: 4 }
+    ];
+
+    var chTopEl = document.getElementById('ch-top');
+    var chBottomEl = document.getElementById('ch-bottom');
+    var chLeftEl = document.getElementById('ch-left');
+    var chRightEl = document.getElementById('ch-right');
+    var chDotEl = document.getElementById('ch-dot');
+
+    function applyCrosshairStyle(preset, dynamicGap) {
+      if (!preset) return;
+      var g = preset.gap + (dynamicGap || 0);
+      var t = preset.thickness;
+      var l = preset.len;
+      var shadow = preset.outline !== 'transparent' ? '0 0 0 1px ' + preset.outline : 'none';
+      var showLines = l > 0 ? 'block' : 'none';
+
+      [chTopEl, chBottomEl, chLeftEl, chRightEl].forEach(function (el) {
+        if (!el) return;
+        el.style.display = showLines;
+        el.style.background = preset.color;
+        el.style.boxShadow = shadow;
+      });
+
+      if (chTopEl) {
+        chTopEl.style.width = t + 'px';
+        chTopEl.style.height = l + 'px';
+        chTopEl.style.left = (-t / 2) + 'px';
+        chTopEl.style.bottom = g + 'px';
+      }
+      if (chBottomEl) {
+        chBottomEl.style.width = t + 'px';
+        chBottomEl.style.height = l + 'px';
+        chBottomEl.style.left = (-t / 2) + 'px';
+        chBottomEl.style.top = g + 'px';
+      }
+      if (chLeftEl) {
+        chLeftEl.style.width = l + 'px';
+        chLeftEl.style.height = t + 'px';
+        chLeftEl.style.top = (-t / 2) + 'px';
+        chLeftEl.style.right = g + 'px';
+      }
+      if (chRightEl) {
+        chRightEl.style.width = l + 'px';
+        chRightEl.style.height = t + 'px';
+        chRightEl.style.top = (-t / 2) + 'px';
+        chRightEl.style.left = g + 'px';
+      }
+
+      if (chDotEl) {
+        if (preset.dot && preset.dotSize > 0) {
+          chDotEl.style.display = 'block';
+          chDotEl.style.width = preset.dotSize + 'px';
+          chDotEl.style.height = preset.dotSize + 'px';
+          chDotEl.style.left = (-preset.dotSize / 2) + 'px';
+          chDotEl.style.top = (-preset.dotSize / 2) + 'px';
+          chDotEl.style.background = preset.color;
+          chDotEl.style.boxShadow = shadow;
+        } else {
+          chDotEl.style.display = 'none';
+        }
+      }
+    }
+
+    function renderCrosshairPreview(containerEl, preset) {
+      containerEl.innerHTML = '';
+      var g = preset.gap;
+      var t = preset.thickness;
+      var l = preset.len;
+      var shadow = preset.outline !== 'transparent' ? '0 0 0 1px ' + preset.outline : 'none';
+
+      if (l > 0) {
+        [
+          { w: t, h: l, left: -t / 2, bottom: g },
+          { w: t, h: l, left: -t / 2, top: g },
+          { w: l, h: t, top: -t / 2, right: g },
+          { w: l, h: t, top: -t / 2, left: g }
+        ].forEach(function (p) {
+          var el = document.createElement('div');
+          el.className = 'xh-prev-part';
+          el.style.width = p.w + 'px';
+          el.style.height = p.h + 'px';
+          el.style.background = preset.color;
+          el.style.boxShadow = shadow;
+          if (p.left !== undefined) el.style.left = p.left + 'px';
+          if (p.right !== undefined) el.style.right = p.right + 'px';
+          if (p.top !== undefined) el.style.top = p.top + 'px';
+          if (p.bottom !== undefined) el.style.bottom = p.bottom + 'px';
+          containerEl.appendChild(el);
+        });
+      }
+      if (preset.dot && preset.dotSize > 0) {
+        var dotEl = document.createElement('div');
+        dotEl.className = 'xh-prev-part';
+        dotEl.style.width = preset.dotSize + 'px';
+        dotEl.style.height = preset.dotSize + 'px';
+        dotEl.style.left = (-preset.dotSize / 2) + 'px';
+        dotEl.style.top = (-preset.dotSize / 2) + 'px';
+        dotEl.style.background = preset.color;
+        dotEl.style.boxShadow = shadow;
+        containerEl.appendChild(dotEl);
+      }
+    }
+
+    function createCanvasTexture(drawFn, size, repeatX, repeatY) {
+      if (!size) size = 256;
+      if (!repeatX) repeatX = 1;
+      if (!repeatY) repeatY = 1;
+      var canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      drawFn(ctx, size);
+      var tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(repeatX, repeatY);
+      tex.anisotropy = 4;
+      return tex;
+    }
+
+    var textures = {
+      sandFloor: createCanvasTexture(function (ctx, s) {
+        ctx.fillStyle = '#c2a67d';
+        ctx.fillRect(0, 0, s, s);
+        for (var i = 0; i < 2500; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? 'rgba(130, 105, 70, 0.18)' : 'rgba(235, 215, 180, 0.18)';
+          ctx.fillRect(Math.random() * s, Math.random() * s, 3, 3);
+        }
+        ctx.strokeStyle = 'rgba(95, 75, 50, 0.25)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, 0, s, s);
+      }, 256, 18, 18),
+
+      sandstoneWall: createCanvasTexture(function (ctx, s) {
+        ctx.fillStyle = '#d4bc94';
+        ctx.fillRect(0, 0, s, s);
+        ctx.fillStyle = '#b89f76';
+        ctx.fillRect(0, s * 0.5, s, 4);
+        ctx.fillRect(s * 0.5, 0, 4, s * 0.5);
+        ctx.fillRect(s * 0.25, s * 0.5, 4, s * 0.5);
+        for (var i = 0; i < 1400; i++) {
+          ctx.fillStyle = 'rgba(90, 70, 45, 0.12)';
+          ctx.fillRect(Math.random() * s, Math.random() * s, 2, 2);
+        }
+      }, 256, 3, 2),
+
+      crateWood: createCanvasTexture(function (ctx, s) {
+        ctx.fillStyle = '#8b5a2b';
+        ctx.fillRect(0, 0, s, s);
+        ctx.fillStyle = '#70441d';
+        for (var y = 0; y < s; y += 32) {
+          ctx.fillRect(0, y, s, 3);
+        }
+        ctx.strokeStyle = '#5c3614';
+        ctx.lineWidth = 18;
+        ctx.strokeRect(9, 9, s - 18, s - 18);
+        ctx.beginPath();
+        ctx.moveTo(14, 14);
+        ctx.lineTo(s - 14, s - 14);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255, 220, 150, 0.45)';
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText('SITE-A', 28, 52);
+      }, 256, 1, 1),
+
+      metalBox: createCanvasTexture(function (ctx, s) {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(0, 0, s, s);
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 14;
+        ctx.strokeRect(7, 7, s - 14, s - 14);
+        ctx.fillStyle = '#eab308';
+        ctx.fillRect(16, s - 34, s - 32, 14);
+      }, 256, 1, 1),
+
+      brushedMetal: createCanvasTexture(function (ctx, s) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, s, s);
+        for (var y = 0; y < s; y++) {
+          var v = 225 + Math.floor((Math.random() - 0.5) * 32);
+          ctx.fillStyle = 'rgba(' + v + ',' + v + ',' + v + ',0.32)';
+          ctx.fillRect(0, y, s, 1);
+        }
+      }, 128, 2, 2),
+
+      carbonGrip: createCanvasTexture(function (ctx, s) {
+        ctx.fillStyle = '#1b2028';
+        ctx.fillRect(0, 0, s, s);
+        ctx.fillStyle = '#2d3542';
+        var step = 8;
+        for (var y = 0; y < s; y += step) {
+          for (var x = 0; x < s; x += step) {
+            if (((x + y) / step) % 2 === 0) {
+              ctx.fillRect(x, y, step - 2, step - 2);
+            }
+          }
+        }
+      }, 128, 4, 4),
+
+      tacticalFabric: createCanvasTexture(function (ctx, s) {
+        ctx.fillStyle = '#f2f2f2';
+        ctx.fillRect(0, 0, s, s);
+        ctx.strokeStyle = 'rgba(20, 24, 30, 0.14)';
+        ctx.lineWidth = 1;
+        for (var i = 0; i < s; i += 4) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, s);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.lineTo(s, i);
+          ctx.stroke();
+        }
+      }, 128, 3, 3)
+    };
+
+    var container = document.getElementById('game-container');
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xd9c3a3);
+    scene.fog = new THREE.FogExp2(0xd9c3a3, 0.011);
+
+    var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 250);
+    camera.rotation.order = 'YXZ';
+    scene.add(camera);
+
+    var renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.domElement.setAttribute('tabindex', '0');
+    container.appendChild(renderer.domElement);
+
+    var hemiLight = new THREE.HemisphereLight(0xfff4e0, 0x7c6548, 0.72);
+    scene.add(hemiLight);
+
+    var dirLight = new THREE.DirectionalLight(0xfff1d6, 1.05);
+    dirLight.position.set(35, 55, 25);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 10;
+    dirLight.shadow.camera.far = 140;
+    var d = 48;
+    dirLight.shadow.camera.left = -d;
+    dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d;
+    dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.bias = -0.0005;
+    scene.add(dirLight);
+
+    var MAPS = {
+      HAVEN:    { name: 'HAVEN',    code: 'HV-ABC', sky: 0xd9c3a3, floor: 0xc2a67d, wall: 0xd4bc94, crate: 0x8b5a2b, metal: 0x475569, layout: 0 },
+      ASCENT:   { name: 'ASCENT',   code: 'AS-MID', sky: 0x93c5fd, floor: 0x94a3b8, wall: 0xe2e8f0, crate: 0x2563eb, metal: 0x334155, layout: 1 },
+      BREEZE:   { name: 'BREEZE',   code: 'BR-ISL', sky: 0x7dd3fc, floor: 0xfde68a, wall: 0xf8fafc, crate: 0x0284c7, metal: 0x0f766e, layout: 2 },
+      ABYSS:    { name: 'ABYSS',    code: 'AB-VOID',sky: 0x1e1b4b, floor: 0x1e293b, wall: 0x312e81, crate: 0x7c3aed, metal: 0x0ea5e9, layout: 3 },
+      SUNSET:   { name: 'SUNSET',   code: 'SS-LA',  sky: 0xfdba74, floor: 0xd6a87c, wall: 0xf4a261, crate: 0xe76f51, metal: 0x2a9d8f, layout: 4 },
+      LOTUS:    { name: 'LOTUS',    code: 'LT-TEM', sky: 0x86efac, floor: 0x6b8e6b, wall: 0xa7c4a0, crate: 0x15803d, metal: 0x3f6212, layout: 5 },
+      PEARL:    { name: 'PEARL',    code: 'PR-OME', sky: 0x67e8f9, floor: 0x64748b, wall: 0xcbd5e1, crate: 0x06b6d4, metal: 0x1e3a8a, layout: 6 },
+      FRACTURE: { name: 'FRACTURE', code: 'FR-RIFT',sky: 0xfca5a5, floor: 0x78716c, wall: 0xa8a29e, crate: 0xdc2626, metal: 0x44403c, layout: 7 },
+      ICEBOX:   { name: 'ICEBOX',   code: 'IC-ARCT',sky: 0xbae6fd, floor: 0xe0f2fe, wall: 0xf0f9ff, crate: 0x0284c7, metal: 0x0369a1, layout: 8 },
+      SPLIT:    { name: 'SPLIT',    code: 'SP-TKY', sky: 0xc4b5fd, floor: 0x475569, wall: 0x94a3b8, crate: 0x6d28d9, metal: 0x1e293b, layout: 9 },
+      BIND:     { name: 'BIND',     code: 'BD-TP',  sky: 0xfcd34d, floor: 0xc8a97e, wall: 0xdeb887, crate: 0xb45309, metal: 0x78350f, layout: 10 }
+    };
+    var MAP_KEYS = Object.keys(MAPS);
+
+    var colliders = [];
+    var mapMeshes = [];
+    var minimapObstacles = [];
+    var activeMapGroup = new THREE.Group();
+    scene.add(activeMapGroup);
+
+    var floorMat = new THREE.MeshStandardMaterial({ map: textures.sandFloor, roughness: 0.9 });
+    var wallMat = new THREE.MeshStandardMaterial({ map: textures.sandstoneWall, roughness: 0.85 });
+    var crateMat = new THREE.MeshStandardMaterial({ map: textures.crateWood, roughness: 0.75 });
+    var metalMat = new THREE.MeshStandardMaterial({ map: textures.metalBox, roughness: 0.45, metalness: 0.35 });
+
+    var botSpawnPoints = [
+      new THREE.Vector3(-26, 0, -28),
+      new THREE.Vector3(24, 0, -30),
+      new THREE.Vector3(0, 0, -18),
+      new THREE.Vector3(-16, 0, -8),
+      new THREE.Vector3(18, 0, 2)
+    ];
+
+    function addMapBox(w, h, depth, x, y, z, material, castShadow, mmColor) {
+      if (castShadow === undefined) castShadow = true;
+      var geo = new THREE.BoxGeometry(w, h, depth);
+      var mesh = new THREE.Mesh(geo, material);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      activeMapGroup.add(mesh);
+
+      var box = new THREE.Box3().setFromObject(mesh);
+      colliders.push(box);
+      mapMeshes.push(mesh);
+      minimapObstacles.push({
+        x: x,
+        z: z,
+        w: w,
+        d: depth,
+        color: mmColor || '#64748b'
+      });
+      return mesh;
+    }
+
+    function pickRandomMapKey() {
+      var idx = Math.floor(Math.random() * MAP_KEYS.length);
+      return MAP_KEYS[idx];
+    }
+
+    function buildRandomOrSelectedMap(mapKey) {
+      var cfg = MAPS[mapKey] || MAPS.HAVEN;
+      state.currentMap = cfg.name;
+
+      for (var i = activeMapGroup.children.length - 1; i >= 0; i--) {
+        var child = activeMapGroup.children[i];
+        activeMapGroup.remove(child);
+        if (child.geometry) child.geometry.dispose();
+      }
+      colliders.length = 0;
+      mapMeshes.length = 0;
+      minimapObstacles.length = 0;
+
+      scene.background = new THREE.Color(cfg.sky);
+      scene.fog = new THREE.FogExp2(cfg.sky, 0.011);
+      floorMat.color.setHex(cfg.floor);
+      wallMat.color.setHex(cfg.wall);
+      crateMat.color.setHex(cfg.crate);
+      metalMat.color.setHex(cfg.metal);
+
+      var floorGeo = new THREE.PlaneGeometry(90, 90);
+      var floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.receiveShadow = true;
+      activeMapGroup.add(floor);
+      mapMeshes.push(floor);
+
+      addMapBox(82, 9, 2, 0, 4.5, -40, wallMat, true, '#475569');
+      addMapBox(82, 9, 2, 0, 4.5, 40, wallMat, true, '#475569');
+      addMapBox(2, 9, 80, -40, 4.5, 0, wallMat, true, '#475569');
+      addMapBox(2, 9, 80, 40, 4.5, 0, wallMat, true, '#475569');
+
+      var p = cfg.layout % 4;
+      var shiftX = ((cfg.layout % 3) - 1) * 5;
+      var shiftZ = (Math.floor(cfg.layout / 3) - 1) * 3;
+
+      if (p === 0) {
+        addMapBox(14, 6, 2.5, -14 + shiftX * 0.4, 3, -4, wallMat, true, '#64748b');
+        addMapBox(14, 6, 2.5, 14 - shiftX * 0.4, 3, -4, wallMat, true, '#64748b');
+        addMapBox(8, 2.2, 2.5, 0, 5.9, -4, wallMat, true, '#64748b');
+        addMapBox(2.5, 5, 16, -22, 2.5, 12 + shiftZ * 0.5, wallMat, true, '#64748b');
+        addMapBox(2.5, 5, 16, 22, 2.5, -16 - shiftZ * 0.5, wallMat, true, '#64748b');
+      } else if (p === 1) {
+        addMapBox(10, 5.5, 2.5, -16, 2.75, -10, wallMat, true, '#64748b');
+        addMapBox(10, 5.5, 2.5, 16, 2.75, -10, wallMat, true, '#64748b');
+        addMapBox(2.5, 5.5, 12, 0, 2.75, -2, wallMat, true, '#64748b');
+        addMapBox(12, 4.5, 2.5, -12, 2.25, 14, wallMat, true, '#64748b');
+        addMapBox(12, 4.5, 2.5, 14, 2.25, 14, wallMat, true, '#64748b');
+      } else if (p === 2) {
+        addMapBox(18, 4.2, 2.2, -12, 2.1, -14, wallMat, true, '#64748b');
+        addMapBox(18, 4.2, 2.2, 14, 2.1, -6, wallMat, true, '#64748b');
+        addMapBox(2.2, 5.0, 14, -18, 2.5, 8, wallMat, true, '#64748b');
+        addMapBox(2.2, 5.0, 14, 18, 2.5, 12, wallMat, true, '#64748b');
+      } else {
+        addMapBox(12, 6.0, 2.5, 0, 3.0, -12, wallMat, true, '#64748b');
+        addMapBox(2.5, 5.0, 14, -14, 2.5, 2, wallMat, true, '#64748b');
+        addMapBox(2.5, 5.0, 14, 14, 2.5, 2, wallMat, true, '#64748b');
+        addMapBox(10, 4.0, 2.2, -16, 2.0, 18, wallMat, true, '#64748b');
+        addMapBox(10, 4.0, 2.2, 16, 2.0, 18, wallMat, true, '#64748b');
+      }
+
+      addMapBox(3.2, 3.2, 3.2, 18 + shiftX * 0.3, 1.6, -26, crateMat, true, '#b45309');
+      addMapBox(3.2, 3.2, 3.2, 21.3 + shiftX * 0.3, 1.6, -26, crateMat, true, '#b45309');
+      addMapBox(2.6, 2.6, 2.6, 19.6 + shiftX * 0.3, 4.5, -26, crateMat, true, '#d97706');
+
+      addMapBox(2.4, 1.5, 2.4, -3.5, 0.75, 6 + shiftZ * 0.4, crateMat, true, '#b45309');
+      addMapBox(2.4, 2.8, 2.4, -6.0, 1.4, 6 + shiftZ * 0.4, metalMat, true, '#eab308');
+      addMapBox(2.6, 2.2, 2.6, 7.5, 1.1, 10, crateMat, true, '#b45309');
+
+      addMapBox(3.0, 3.0, 3.0, -28, 1.5, -22, metalMat, true, '#eab308');
+      addMapBox(2.2, 1.4, 2.2, -25.2, 0.7, -22, crateMat, true, '#b45309');
+      addMapBox(2.8, 2.8, 2.8, -14, 1.4, 24, crateMat, true, '#b45309');
+      addMapBox(2.8, 2.8, 2.8, 15, 1.4, 26, metalMat, true, '#eab308');
+    }
+
+    var WEAPONS = {
+      CLASSIC: { slot: 1, price: 0, name: 'CLASSIC', fireMode: 'semi', modeLabel: 'PISTOL • SEMI • RMB ZOOM', fireRate: 0.16, bodyDmg: 26, headDmg: 78, magSize: 12, reserveSize: 36, reloadTime: 1.1, spreadBase: 0.006, recoilStep: 0.015, zoomFov: 58, pitchMult: 1.0, heavy: false, color: 0x2c3542, accent: 0x94a3b8, barrelLen: 0.24 },
+      GHOST: { slot: 1, price: 500, name: 'SOVEREIGN GHOST', fireMode: 'semi', modeLabel: 'PISTOL • SEMI • RMB ZOOM', fireRate: 0.145, bodyDmg: 30, headDmg: 105, magSize: 15, reserveSize: 45, reloadTime: 1.05, spreadBase: 0.004, recoilStep: 0.014, zoomFov: 56, pitchMult: 1.18, heavy: false, color: 0x1e2530, accent: 0xfbbf24, barrelLen: 0.26 },
+      SHERIFF: { slot: 1, price: 800, name: 'REAVER SHERIFF', fireMode: 'semi', modeLabel: 'PISTOL • HEAVY SEMI • RMB ZOOM', fireRate: 0.24, bodyDmg: 55, headDmg: 159, magSize: 6, reserveSize: 24, reloadTime: 1.25, spreadBase: 0.005, recoilStep: 0.032, zoomFov: 54, pitchMult: 0.78, heavy: true, color: 0x2a245e, accent: 0xc084fc, barrelLen: 0.30 },
+      KURONAMI_VANDAL: { slot: 2, price: 2900, name: 'KURONAMI VANDAL', fireMode: 'auto', modeLabel: 'RIFLE • AUTO • RMB DÜRBÜN', fireRate: 0.105, bodyDmg: 40, headDmg: 160, magSize: 25, reserveSize: 75, reloadTime: 1.4, spreadBase: 0.008, recoilStep: 0.017, zoomFov: 48, pitchMult: 0.95, heavy: false, color: 0x581c87, accent: 0xf59e0b, barrelLen: 0.44 },
+      RGX_PHANTOM: { slot: 2, price: 2900, name: 'RGX PHANTOM', fireMode: 'auto', modeLabel: 'RIFLE • AUTO • RMB DÜRBÜN', fireRate: 0.088, bodyDmg: 35, headDmg: 140, magSize: 30, reserveSize: 90, reloadTime: 1.3, spreadBase: 0.006, recoilStep: 0.013, zoomFov: 48, pitchMult: 1.08, heavy: false, color: 0xe2e8f0, accent: 0xfacc15, barrelLen: 0.42 },
+      PRIME_ODIN: { slot: 2, price: 3200, name: 'PRIME ODIN', fireMode: 'auto', modeLabel: 'HEAVY • AUTO • RMB DÜRBÜN', fireRate: 0.082, bodyDmg: 38, headDmg: 95, magSize: 100, reserveSize: 200, reloadTime: 2.2, spreadBase: 0.015, recoilStep: 0.012, zoomFov: 46, pitchMult: 0.68, heavy: true, color: 0x272320, accent: 0xf59e0b, barrelLen: 0.52 },
+      PRIME_OPERATOR: { slot: 2, price: 4700, name: 'PRIME OPERATOR', fireMode: 'bolt', modeLabel: 'SNIPER • BOLT • RMB DÜRBÜN', fireRate: 0.95, bodyDmg: 150, headDmg: 255, magSize: 5, reserveSize: 15, reloadTime: 1.85, spreadBase: 0.001, recoilStep: 0.065, zoomFov: 24, pitchMult: 0.58, heavy: true, color: 0xe2e8f0, accent: 0xeab308, barrelLen: 0.58 },
+      KNIFE: { slot: 3, price: 0, name: 'TACTICAL KNIFE', fireMode: 'melee', modeLabel: 'MELEE • YAKIN DARBE', fireRate: 0.36, bodyDmg: 75, headDmg: 150, magSize: 0, reserveSize: 0, reloadTime: 0.1, spreadBase: 0, recoilStep: 0, zoomFov: 75, pitchMult: 1.0, heavy: false, color: 0x94a3b8, accent: 0x38bdf8, barrelLen: 0.22 }
+    };
+
+    var ammoStore = {};
+    Object.keys(WEAPONS).forEach(function (k) {
+      ammoStore[k] = { mag: WEAPONS[k].magSize, reserve: WEAPONS[k].reserveSize };
+    });
+
+    var weaponGroup = new THREE.Group();
+    var gunBodyMat = new THREE.MeshStandardMaterial({ color: 0x2c3542, map: textures.brushedMetal, roughness: 0.26, metalness: 0.82 });
+    var gunTrimMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, map: textures.brushedMetal, roughness: 0.18, metalness: 0.92 });
+    var gunDarkMetalMat = new THREE.MeshStandardMaterial({ color: 0x14181f, map: textures.carbonGrip, roughness: 0.38, metalness: 0.85 });
+    var gunGripMat = new THREE.MeshStandardMaterial({ color: 0x191d24, map: textures.carbonGrip, roughness: 0.78, metalness: 0.18 });
+    var gunScopeMat = new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.14, metalness: 0.92 });
+    var gunLensMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.55, roughness: 0.08, metalness: 0.95 });
+    var gunGlowMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 0.9, roughness: 0.22, metalness: 0.55 });
+
+    var firearmParts = new THREE.Group();
+    var knifeParts = new THREE.Group();
+
+    var lowerReceiver = new THREE.Mesh(new THREE.BoxGeometry(0.064, 0.056, 0.36), gunDarkMetalMat);
+    lowerReceiver.position.set(0, -0.015, 0.01);
+    var upperReceiver = new THREE.Mesh(new THREE.BoxGeometry(0.068, 0.052, 0.40), gunBodyMat);
+    upperReceiver.position.set(0, 0.024, 0.0);
+    upperReceiver.castShadow = true;
+
+    var topPicatinny = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.014, 0.44), gunDarkMetalMat);
+    topPicatinny.position.set(0, 0.056, -0.04);
+
+    var sideAccentPlate = new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.014, 0.26), gunTrimMat);
+    sideAccentPlate.position.set(0, 0.026, -0.02);
+
+    var glowChannel = new THREE.Mesh(new THREE.BoxGeometry(0.074, 0.008, 0.18), gunGlowMat);
+    glowChannel.position.set(0, 0.010, -0.04);
+
+    var triggerGuardFront = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.008, 0.065), gunDarkMetalMat);
+    triggerGuardFront.position.set(0, -0.056, 0.055);
+    var triggerGuardBack = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.024, 0.008), gunDarkMetalMat);
+    triggerGuardBack.position.set(0, -0.046, 0.085);
+    var triggerShoe = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.024, 0.010), gunTrimMat);
+    triggerShoe.position.set(0, -0.044, 0.062);
+    triggerShoe.rotation.z = 0.2;
+
+    var handguardGroup = new THREE.Group();
+    handguardGroup.position.set(0, 0.012, -0.27);
+    var handguardShell = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.064, 0.22), gunDarkMetalMat);
+    var handguardTrim = new THREE.Mesh(new THREE.BoxGeometry(0.066, 0.012, 0.18), gunTrimMat);
+    handguardTrim.position.set(0, 0.018, 0);
+    handguardGroup.add(handguardShell, handguardTrim);
+
+    var barrelGroup = new THREE.Group();
+    barrelGroup.position.set(0, 0.022, -0.22);
+    var barrelTube = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.015, 0.38, 16), gunTrimMat);
+    barrelTube.rotation.x = Math.PI / 2;
+    barrelTube.position.set(0, 0, -0.17);
+    var muzzleDevice = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.018, 0.075, 14), gunDarkMetalMat);
+    muzzleDevice.rotation.x = Math.PI / 2;
+    muzzleDevice.position.set(0, 0, -0.37);
+    var muzzleRing = new THREE.Mesh(new THREE.TorusGeometry(0.019, 0.003, 8, 16), gunGlowMat);
+    muzzleRing.position.set(0, 0, -0.405);
+    barrelGroup.add(barrelTube, muzzleDevice, muzzleRing);
+
+    var stockGroup = new THREE.Group();
+    stockGroup.position.set(0, -0.005, 0.20);
+    var stockUpperBar = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.022, 0.17), gunDarkMetalMat);
+    stockUpperBar.position.set(0, 0.024, 0.08);
+    var stockLowerBar = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.020, 0.15), gunBodyMat);
+    stockLowerBar.position.set(0, -0.022, 0.07);
+    stockLowerBar.rotation.x = -0.14;
+    var buttPad = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.125, 0.028), gunGripMat);
+    buttPad.position.set(0, -0.008, 0.165);
+    stockGroup.add(stockUpperBar, stockLowerBar, buttPad);
+
+    var gripGroup = new THREE.Group();
+    gripGroup.position.set(0, -0.036, 0.095);
+    gripGroup.rotation.x = 0.30;
+    var gripCore = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.115, 0.056), gunGripMat);
+    gripCore.position.set(0, -0.055, 0);
+    var gripBackstrap = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.11, 0.012), gunTrimMat);
+    gripBackstrap.position.set(0, -0.055, 0.028);
+    gripGroup.add(gripCore, gripBackstrap);
+
+    var magGroup = new THREE.Group();
+    magGroup.position.set(0, -0.038, -0.055);
+    magGroup.rotation.x = 0.18;
+    var magBody = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.165, 0.076), gunDarkMetalMat);
+    magBody.position.set(0, -0.082, 0);
+    var magLip = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.018, 0.082), gunTrimMat);
+    magLip.position.set(0, -0.006, 0);
+    var magFloorplate = new THREE.Mesh(new THREE.BoxGeometry(0.050, 0.018, 0.086), gunBodyMat);
+    magFloorplate.position.set(0, -0.168, 0);
+    magGroup.add(magBody, magLip, magFloorplate);
+
+    var opticGroup = new THREE.Group();
+    opticGroup.position.set(0, 0.078, -0.025);
+    var mountFront = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.018, 0.022), gunDarkMetalMat);
+    mountFront.position.set(0, -0.016, -0.055);
+    var mountRear = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.018, 0.022), gunDarkMetalMat);
+    mountRear.position.set(0, -0.016, 0.055);
+    var scopeTube = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.025, 0.175, 18), gunScopeMat);
+    scopeTube.rotation.x = Math.PI / 2;
+    var scopeObjective = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.045, 18), gunBodyMat);
+    scopeObjective.rotation.x = Math.PI / 2;
+    scopeObjective.position.set(0, 0, -0.085);
+    var frontLens = new THREE.Mesh(new THREE.CircleGeometry(0.024, 18), gunLensMat);
+    frontLens.position.set(0, 0, -0.108);
+    frontLens.rotation.y = Math.PI;
+    var rearLens = new THREE.Mesh(new THREE.CircleGeometry(0.020, 18), gunLensMat);
+    rearLens.position.set(0, 0, 0.089);
+    opticGroup.add(mountFront, mountRear, scopeTube, scopeObjective, frontLens, rearLens);
+
+    firearmParts.add(
+      lowerReceiver, upperReceiver, topPicatinny, sideAccentPlate, glowChannel,
+      triggerGuardFront, triggerGuardBack, triggerShoe,
+      handguardGroup, barrelGroup, stockGroup, gripGroup, magGroup, opticGroup
+    );
+
+    var knifeHandleMat = new THREE.MeshStandardMaterial({ color: 0x1c2129, map: textures.carbonGrip, roughness: 0.65, metalness: 0.25 });
+    var knifeSteelMat = new THREE.MeshStandardMaterial({ color: 0xdbeafe, map: textures.brushedMetal, roughness: 0.14, metalness: 0.96 });
+    var knifeEdgeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.08, metalness: 0.99 });
+
+    var knifePommelRing = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.006, 10, 20), gunTrimMat);
+    knifePommelRing.position.set(0, -0.045, 0.105);
+    var knifeHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.017, 0.125, 14), knifeHandleMat);
+    knifeHandle.rotation.x = Math.PI / 2 + 0.14;
+    knifeHandle.position.set(0, -0.032, 0.038);
+    var knifeGuard = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.014, 0.018), gunTrimMat);
+    knifeGuard.position.set(0, -0.022, -0.025);
+    knifeGuard.rotation.x = 0.2;
+
+    var knifeSpine = new THREE.Mesh(new THREE.BoxGeometry(0.007, 0.022, 0.21), knifeSteelMat);
+    knifeSpine.position.set(0, -0.015, -0.125);
+    knifeSpine.rotation.x = -0.08;
+    var knifeCuttingEdge = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.028, 0.19), knifeEdgeMat);
+    knifeCuttingEdge.position.set(0, -0.032, -0.118);
+    knifeCuttingEdge.rotation.x = 0.06;
+    var knifeAccentStrip = new THREE.Mesh(new THREE.BoxGeometry(0.009, 0.006, 0.14), gunGlowMat);
+    knifeAccentStrip.position.set(0, -0.021, -0.105);
+    knifeParts.add(knifePommelRing, knifeHandle, knifeGuard, knifeSpine, knifeCuttingEdge, knifeAccentStrip);
+
+    var flashMat = new THREE.MeshBasicMaterial({ color: 0xffdd55, transparent: true, opacity: 0 });
+    var muzzleFlash = new THREE.Mesh(new THREE.OctahedronGeometry(0.095, 0), flashMat);
+    muzzleFlash.position.set(0, 0.022, -0.64);
+    muzzleFlash.scale.set(1.1, 1.1, 2.3);
+
+    weaponGroup.add(firearmParts, knifeParts, muzzleFlash);
+
+    var gunRestPos = new THREE.Vector3(0.28, -0.25, -0.45);
+    var gunAdsPos = new THREE.Vector3(0.0, -0.165, -0.32);
+    weaponGroup.position.copy(gunRestPos);
+    camera.add(weaponGroup);
+
+    var AGENT_PROFILES = {
+      JETT: { name: 'JETT', role: 'DUELIST', desc: 'JETT — Rüzgar çevikliği (Q: Updraft ile havaya sıçra • E: Tailwind ile ileri atıl)', hp: 100, speedMult: 1.25, damageMult: 1.0, skillCooldown: 6.5, qName: 'UPDRAFT', qCdMax: 6, eName: 'TAILWIND', eCdMax: 7, hitColor: 0x2dd4bf, badgeColor: '#2dd4bf', palette: { skin: 0xf1c29b, hair: 0xf4f6f9, primary: 0x38b2ac, secondary: 0x1e293b, accent: 0x2dd4bf, pants: 0x262930, style: 'bun' } },
+      CLOVE: { name: 'CLOVE', role: 'CONTROLLER', desc: 'CLOVE — Ölümsüz enerji (Q: Meddle ile alan hasarı/yavaşlatma • E: Pick-Me-Up ile can yenile)', hp: 100, speedMult: 1.08, damageMult: 1.0, skillCooldown: 7.0, qName: 'MEDDLE', qCdMax: 7, eName: 'PICK-ME-UP', eCdMax: 8, hitColor: 0xf472b6, badgeColor: '#f472b6', palette: { skin: 0xe6b89c, hair: 0x1e1b24, primary: 0xf472b6, secondary: 0x6d28d9, accent: 0xa3e635, pants: 0x2e2a3b, style: 'horns' } },
+      NEON: { name: 'NEON', role: 'DUELIST', desc: 'NEON — Yüksek voltaj hızı (Q: Relay Bolt şok ışını • E: High Gear süper hız)', hp: 100, speedMult: 1.45, damageMult: 1.05, skillCooldown: 5.5, qName: 'RELAY BOLT', qCdMax: 6, eName: 'HIGH GEAR', eCdMax: 7, hitColor: 0x38bdf8, badgeColor: '#38bdf8', palette: { skin: 0xd99b66, hair: 0x2563eb, primary: 0x1d4ed8, secondary: 0xc084fc, accent: 0xfacc15, pants: 0x1e293b, style: 'pigtails' } },
+      REYNA: { name: 'REYNA', role: 'DUELIST', desc: 'REYNA — Ruh avcısı (Q: Leer ile rakipleri yavaşlat/hasar ver • E: Dismiss hayalet hızı + can)', hp: 110, speedMult: 1.12, damageMult: 1.12, skillCooldown: 6.0, qName: 'LEER', qCdMax: 7, eName: 'DISMISS', eCdMax: 8, hitColor: 0xc084fc, badgeColor: '#c084fc', palette: { skin: 0xd8a07a, hair: 0x1f1629, primary: 0x581c87, secondary: 0x1e293b, accent: 0xe879f9, pants: 0x1e2230, style: 'long' } },
+      CHAMBER: { name: 'CHAMBER', role: 'SENTINEL', desc: 'CHAMBER — Keskin nişancı (Q: Headhunter tek atış altın mermi • E: Rendezvous ışınlanma)', hp: 100, speedMult: 1.04, damageMult: 1.35, skillCooldown: 6.5, qName: 'HEADHUNTER', qCdMax: 7, eName: 'RENDEZVOUS', eCdMax: 8, hitColor: 0xfbbf24, badgeColor: '#fbbf24', palette: { skin: 0xe2ad85, hair: 0x292524, primary: 0x1e3a8a, secondary: 0xf8fafc, accent: 0xf59e0b, pants: 0x292524, style: 'short' } },
+      RAZE: { name: 'RAZE', role: 'DUELIST', desc: 'RAZE — Ağır patlayıcı uzmanı (Q: Paint Shells alan bombası • E: Blast Pack roket sıçrayışı)', hp: 105, speedMult: 1.15, damageMult: 1.18, skillCooldown: 6.2, qName: 'PAINT SHELLS', qCdMax: 7, eName: 'BLAST PACK', eCdMax: 6, hitColor: 0xfb923c, badgeColor: '#fb923c', palette: { skin: 0xc6865c, hair: 0x271c19, primary: 0x3f6212, secondary: 0xfacc15, accent: 0xf97316, pants: 0x1f2924, style: 'cap' } },
+      OMEN: { name: 'OMEN', role: 'CONTROLLER', desc: 'OMEN — Gölge avcısı (Q: Paranoia karanlık dalgası • E: Shrouded Step ileri ışınlanma)', hp: 105, speedMult: 1.08, damageMult: 1.08, skillCooldown: 7.5, qName: 'PARANOIA', qCdMax: 7, eName: 'SHROUDED STEP', eCdMax: 7, hitColor: 0x60a5fa, badgeColor: '#60a5fa', palette: { skin: 0x0f172a, hair: 0x3b82f6, primary: 0x3730a3, secondary: 0x94a3b8, accent: 0x38bdf8, pants: 0x1e1b2e, style: 'hood' } },
+      BREACH: { name: 'BREACH', role: 'INITIATOR', desc: 'BREACH — Biyonik yıkıcı (Q: Aftershock duvar arkası patlama • E: Fault Line sarsıntı)', hp: 130, speedMult: 0.98, damageMult: 1.15, skillCooldown: 7.0, qName: 'AFTERSHOCK', qCdMax: 7, eName: 'FAULT LINE', eCdMax: 8, hitColor: 0xea580c, badgeColor: '#ea580c', palette: { skin: 0xe8b28c, hair: 0xb45309, primary: 0x15803d, secondary: 0xe5e7eb, accent: 0xf97316, pants: 0x1e332a, style: 'short' } }
+    };
+
+    var AGENT_KEYS = Object.keys(AGENT_PROFILES);
+
+    var state = {
+      selectedAgent: 'JETT',
+      currentMap: 'HAVEN',
+      activeSlot: 1,
+      slot1Weapon: 'CLASSIC',
+      slot2Weapon: null,
+      slot3Weapon: 'KNIFE',
+      credits: 800,
+      sensitivity: 1.0,
+      crosshairId: 'xh0',
+      isScoped: false,
+      semiFiredThisPress: false,
+      hasStartedOnce: false,
+      inMatch: false,
+      isPaused: false,
+      isShopOpen: false,
+      isLocked: false,
+      roundActive: true,
+      roundNum: 1,
+      ctScore: 0,
+      tScore: 0,
+      hp: 100,
+      armor: 0,
+      isReloading: false,
+      lastShotTime: 0,
+      recoilPitch: 0,
+      spread: 0,
+      yaw: 0,
+      pitch: 0,
+      lastMouseX: null,
+      lastMouseY: null,
+      velocity: new THREE.Vector3(),
+      canJump: false,
+      isCrouching: false,
+      isSprinting: false,
+      currentEyeHeight: 1.7,
+      bobTimer: 0,
+      qCooldown: 0,
+      eCooldown: 0,
+      speedBuffTimer: 0,
+      goldenBulletReady: false
+    };
+
+    function getEquippedWeaponKey() {
+      if (state.activeSlot === 1) return state.slot1Weapon;
+      if (state.activeSlot === 2) return state.slot2Weapon;
+      return 'KNIFE';
+    }
+
+    var keys = {};
+    var isMouseDown = false;
+    var playerPos = new THREE.Vector3(0, 0, 32);
+    var PLAYER_RADIUS = 0.48;
+    var STAND_HEIGHT = 1.75;
+    var CROUCH_HEIGHT = 1.05;
+
+    function clearAllInputStates() {
+      for (var k in keys) {
+        if (Object.prototype.hasOwnProperty.call(keys, k)) {
+          keys[k] = false;
+        }
+      }
+      isMouseDown = false;
+      state.semiFiredThisPress = false;
+      state.isSprinting = false;
+      state.isCrouching = false;
+      state.velocity.set(0, 0, state.velocity.y);
+      state.lastMouseX = null;
+      state.lastMouseY = null;
+    }
+
+    var lineupBarEl = document.getElementById('lineup-bar');
+    var agentGridEl = document.getElementById('agent-grid');
+    var mapPoolListEl = document.getElementById('map-pool-list');
+    var selectedDescEl = document.getElementById('selected-agent-desc');
+    var resumeBtn = document.getElementById('resume-btn');
+    var agentMenuBtn = document.getElementById('agent-menu-btn');
+    var closeShopBtn = document.getElementById('close-shop-btn');
+    var sensSliderEl = document.getElementById('sens-slider');
+    var sensValEl = document.getElementById('sens-val');
+    var crosshairGridEl = document.getElementById('crosshair-grid');
+    var shopCreditsEl = document.getElementById('shop-credits');
+    var shopPistolsEl = document.getElementById('shop-pistols');
+    var shopPrimariesEl = document.getElementById('shop-primaries');
+    var shopArmorsEl = document.getElementById('shop-armors');
+
+    var hpEl = document.getElementById('hp-val');
+    var armorEl = document.getElementById('armor-val');
+    var creditsEl = document.getElementById('credits-val');
+    var magEl = document.getElementById('ammo-mag');
+    var resEl = document.getElementById('ammo-res');
+    var ctScoreEl = document.getElementById('ct-score');
+    var tScoreEl = document.getElementById('t-score');
+    var roundNumEl = document.getElementById('round-num');
+    var mapBadgeTextEl = document.getElementById('map-badge-text');
+    var mmMapCodeEl = document.getElementById('mm-map-code');
+    var enemyCountEl = document.getElementById('enemy-count');
+    var bannerEl = document.getElementById('center-banner');
+    var hitmarkerEl = document.getElementById('hitmarker');
+    var damageOverlayEl = document.getElementById('damage-overlay');
+    var skillTintEl = document.getElementById('skill-tint');
+    var scopeOverlayEl = document.getElementById('scope-overlay');
+    var scopeMetaEl = document.getElementById('scope-meta');
+    var killfeedEl = document.getElementById('killfeed');
+    var crosshairEl = document.getElementById('crosshair');
+    var slotQEl = document.getElementById('slot-q');
+    var slotEEl = document.getElementById('slot-e');
+    var nameQEl = document.getElementById('name-q');
+    var nameEEl = document.getElementById('name-e');
+    var cdQEl = document.getElementById('cd-q');
+    var cdEEl = document.getElementById('cd-e');
+    var playerAgentTagEl = document.getElementById('player-agent-tag');
+    var weaponNameEl = document.getElementById('weapon-name');
+    var weaponDmgBadgeEl = document.getElementById('weapon-dmg-badge');
+    var weaponSilhouetteEl = document.getElementById('weapon-silhouette');
+    var weaponModeEl = document.getElementById('weapon-mode');
+    var chip1El = document.getElementById('slot-chip-1');
+    var chip2El = document.getElementById('slot-chip-2');
+    var chip3El = document.getElementById('slot-chip-3');
+    var minimapCanvas = document.getElementById('minimap-canvas');
+    var minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
+
+    function renderMapPoolBadges() {
+      if (!mapPoolListEl) return;
+      mapPoolListEl.innerHTML = MAP_KEYS.map(function (k) {
+        return '<span class="map-pool-pill">' + MAPS[k].name + '</span>';
+      }).join('');
+    }
+
+    function drawMinimap() {
+      if (!minimapCtx || !minimapCanvas) return;
+      var w = minimapCanvas.width;
+      var h = minimapCanvas.height;
+      minimapCtx.clearRect(0, 0, w, h);
+
+      minimapCtx.fillStyle = '#111722';
+      minimapCtx.fillRect(0, 0, w, h);
+
+      minimapCtx.strokeStyle = 'rgba(148, 163, 184, 0.08)';
+      minimapCtx.lineWidth = 1;
+      for (var g = 20; g < w; g += 20) {
+        minimapCtx.beginPath();
+        minimapCtx.moveTo(g, 0);
+        minimapCtx.lineTo(g, h);
+        minimapCtx.stroke();
+        minimapCtx.beginPath();
+        minimapCtx.moveTo(0, g);
+        minimapCtx.lineTo(w, g);
+        minimapCtx.stroke();
+      }
+
+      var scale = (w - 12) / 84;
+      function toMapX(wx) { return w / 2 + wx * scale; }
+      function toMapY(wz) { return h / 2 + wz * scale; }
+
+      for (var i = 0; i < minimapObstacles.length; i++) {
+        var ob = minimapObstacles[i];
+        var mw = Math.max(2, ob.w * scale);
+        var mh = Math.max(2, ob.d * scale);
+        minimapCtx.fillStyle = ob.color;
+        minimapCtx.fillRect(toMapX(ob.x) - mw / 2, toMapY(ob.z) - mh / 2, mw, mh);
+      }
+
+      for (var j = 0; j < bots.length; j++) {
+        var b = bots[j];
+        var bx = toMapX(b.group.position.x);
+        var by = toMapY(b.group.position.z);
+        if (b.alive) {
+          minimapCtx.fillStyle = b.profile.badgeColor;
+          minimapCtx.beginPath();
+          minimapCtx.arc(bx, by, 4.2, 0, Math.PI * 2);
+          minimapCtx.fill();
+          minimapCtx.strokeStyle = '#0f172a';
+          minimapCtx.lineWidth = 1.2;
+          minimapCtx.stroke();
+        } else {
+          minimapCtx.strokeStyle = 'rgba(248, 113, 113, 0.55)';
+          minimapCtx.lineWidth = 1.5;
+          minimapCtx.beginPath();
+          minimapCtx.moveTo(bx - 3, by - 3);
+          minimapCtx.lineTo(bx + 3, by + 3);
+          minimapCtx.moveTo(bx + 3, by - 3);
+          minimapCtx.lineTo(bx - 3, by + 3);
+          minimapCtx.stroke();
+        }
+      }
+
+      var px = toMapX(playerPos.x);
+      var py = toMapY(playerPos.z);
+      var forwardAngle = -state.yaw - Math.PI / 2;
+
+      minimapCtx.fillStyle = 'rgba(56, 189, 248, 0.24)';
+      minimapCtx.beginPath();
+      minimapCtx.moveTo(px, py);
+      minimapCtx.arc(px, py, 22, forwardAngle - 0.42, forwardAngle + 0.42);
+      minimapCtx.closePath();
+      minimapCtx.fill();
+
+      minimapCtx.fillStyle = '#38bdf8';
+      minimapCtx.beginPath();
+      minimapCtx.arc(px, py, 5, 0, Math.PI * 2);
+      minimapCtx.fill();
+      minimapCtx.strokeStyle = '#ffffff';
+      minimapCtx.lineWidth = 1.5;
+      minimapCtx.stroke();
+    }
+
+    function getCurrentPreset() {
+      for (var i = 0; i < CROSSHAIR_PRESETS.length; i++) {
+        if (CROSSHAIR_PRESETS[i].id === state.crosshairId) return CROSSHAIR_PRESETS[i];
+      }
+      return CROSSHAIR_PRESETS[0];
+    }
+
+    function renderCrosshairSettingsGrid() {
+      if (!crosshairGridEl) return;
+      crosshairGridEl.innerHTML = '';
+      CROSSHAIR_PRESETS.forEach(function (pr) {
+        var tile = document.createElement('div');
+        tile.className = 'xh-tile' + (pr.id === state.crosshairId ? ' selected' : '');
+        var center = document.createElement('div');
+        center.className = 'xh-preview-center';
+        renderCrosshairPreview(center, pr);
+        tile.appendChild(center);
+        tile.addEventListener('click', function () {
+          state.crosshairId = pr.id;
+          renderCrosshairSettingsGrid();
+          applyCrosshairStyle(getCurrentPreset(), 0);
+        });
+        crosshairGridEl.appendChild(tile);
+      });
+    }
+
+    function isKeyPressed(codes, chars) {
+      if (!state.inMatch || state.isPaused || state.isShopOpen) return false;
+      for (var i = 0; i < codes.length; i++) {
+        if (keys[codes[i]]) return true;
+      }
+      for (var j = 0; j < chars.length; j++) {
+        if (keys['CHAR_' + chars[j]]) return true;
+      }
+      return false;
+    }
+
+    function applyWeaponVisuals(wpnKey) {
+      if (!wpnKey || !WEAPONS[wpnKey]) {
+        weaponGroup.visible = false;
+        return;
+      }
+      var w = WEAPONS[wpnKey];
+      var isMelee = w.fireMode === 'melee';
+      weaponGroup.visible = !(state.isScoped && wpnKey === 'PRIME_OPERATOR');
+      firearmParts.visible = !isMelee;
+      knifeParts.visible = isMelee;
+
+      gunBodyMat.color.setHex(w.color);
+      gunTrimMat.color.setHex(w.accent);
+      gunGlowMat.color.setHex(w.accent);
+      gunGlowMat.emissive.setHex(w.accent);
+      flashMat.color.setHex(w.accent);
+
+      if (!isMelee) {
+        var lenRatio = w.barrelLen / 0.44;
+        barrelTube.scale.set(1, lenRatio, 1);
+        barrelTube.position.set(0, 0, -0.17 * lenRatio);
+        muzzleDevice.position.set(0, 0, -0.35 * lenRatio);
+        muzzleRing.position.set(0, 0, -0.388 * lenRatio);
+        muzzleFlash.position.set(0, 0.022, -0.22 - 0.41 * lenRatio);
+
+        var isPistol = w.slot === 1;
+        var isSniper = wpnKey === 'PRIME_OPERATOR';
+        var isHeavy = wpnKey === 'PRIME_ODIN';
+
+        stockGroup.visible = !isPistol;
+        handguardGroup.visible = !isPistol;
+        magGroup.visible = true;
+        magGroup.scale.set(1, isHeavy ? 1.32 : (isPistol ? 0.72 : 1.0), isHeavy ? 1.25 : 1.0);
+        opticGroup.visible = isSniper || wpnKey === 'KURONAMI_VANDAL' || wpnKey === 'RGX_PHANTOM' || isHeavy;
+        opticGroup.scale.setScalar(isSniper ? 1.24 : 1.0);
+      }
+    }
+
+    function setScopeState(active) {
+      var wpnKey = getEquippedWeaponKey();
+      if (!wpnKey || wpnKey === 'KNIFE') active = false;
+      state.isScoped = active;
+      var w = wpnKey ? WEAPONS[wpnKey] : null;
+      camera.fov = (active && w) ? w.zoomFov : 75;
+      camera.updateProjectionMatrix();
+
+      var isFullReticle = active && (wpnKey === 'PRIME_OPERATOR' || wpnKey === 'KURONAMI_VANDAL' || wpnKey === 'RGX_PHANTOM' || wpnKey === 'PRIME_ODIN');
+      scopeOverlayEl.classList.toggle('active', isFullReticle);
+      if (scopeMetaEl && w) {
+        var zoomFactor = (75 / w.zoomFov).toFixed(1);
+        scopeMetaEl.textContent = w.name + ' • ' + zoomFactor + 'X OPTIC • RMB KAPAT';
+      }
+      crosshairEl.style.display = 'block';
+      crosshairEl.style.opacity = active ? '0.2' : '1';
+      applyWeaponVisuals(wpnKey);
+      AudioFX.playScope(active);
+    }
+
+    function switchSlot(slotNum) {
+      state.activeSlot = slotNum;
+      state.isReloading = false;
+      state.semiFiredThisPress = false;
+      if (state.isScoped) setScopeState(false);
+      applyWeaponVisuals(getEquippedWeaponKey());
+      updateHUD();
+    }
+
+    function buyWeapon(wpnKey) {
+      var w = WEAPONS[wpnKey];
+      if (!w) return;
+      if (state.credits < w.price) {
+        showBanner('YETERSİZ KREDİ (' + w.price + ' GEREK)', 1200);
+        return;
+      }
+      state.credits -= w.price;
+      ammoStore[wpnKey].mag = w.magSize;
+      ammoStore[wpnKey].reserve = w.reserveSize;
+      if (w.slot === 1) {
+        state.slot1Weapon = wpnKey;
+        state.activeSlot = 1;
+      } else if (w.slot === 2) {
+        state.slot2Weapon = wpnKey;
+        state.activeSlot = 2;
+      }
+      AudioFX.playBuy();
+      applyWeaponVisuals(getEquippedWeaponKey());
+      updateHUD();
+      renderShop();
+      ensureHudAndCrosshairVisible();
+    }
+
+    function buyArmor(amount, cost) {
+      if (state.credits < cost) {
+        showBanner('YETERSİZ KREDİ (' + cost + ' GEREK)', 1200);
+        return;
+      }
+      state.credits -= cost;
+      state.armor = Math.min(100, Math.max(state.armor, amount));
+      AudioFX.playBuy();
+      updateHUD();
+      renderShop();
+      ensureHudAndCrosshairVisible();
+    }
+
+    function renderShop() {
+      shopCreditsEl.textContent = state.credits;
+      shopPistolsEl.innerHTML = '';
+      shopPrimariesEl.innerHTML = '';
+      shopArmorsEl.innerHTML = '';
+
+      ['CLASSIC', 'GHOST', 'SHERIFF'].forEach(function (k) {
+        var w = WEAPONS[k];
+        var owned = state.slot1Weapon === k;
+        var row = document.createElement('div');
+        row.className = 'shop-item' + (owned ? ' owned' : '');
+        row.innerHTML = '<div><div class="shop-item-name">' + w.name + '</div><div class="shop-item-sub">HASAR ' + w.bodyDmg + ' / KAFA ' + w.headDmg + '</div></div><div class="shop-price">' + (owned ? 'KUŞANILDI' : w.price + ' ¤') + '</div>';
+        row.addEventListener('click', function () { buyWeapon(k); });
+        shopPistolsEl.appendChild(row);
+      });
+
+      ['KURONAMI_VANDAL', 'RGX_PHANTOM', 'PRIME_ODIN', 'PRIME_OPERATOR'].forEach(function (k) {
+        var w = WEAPONS[k];
+        var owned = state.slot2Weapon === k;
+        var row = document.createElement('div');
+        row.className = 'shop-item' + (owned ? ' owned' : '');
+        row.innerHTML = '<div><div class="shop-item-name">' + w.name + '</div><div class="shop-item-sub">' + w.fireMode.toUpperCase() + ' • HASAR ' + w.bodyDmg + ' / KAFA ' + w.headDmg + '</div></div><div class="shop-price">' + (owned ? 'KUŞANILDI' : w.price + ' ¤') + '</div>';
+        row.addEventListener('click', function () { buyWeapon(k); });
+        shopPrimariesEl.appendChild(row);
+      });
+
+      [
+        { label: 'HAFİF ZIRH (50)', val: 50, cost: 400 },
+        { label: 'AĞIR ZIRH (100)', val: 100, cost: 1000 }
+      ].forEach(function (a) {
+        var row = document.createElement('div');
+        row.className = 'shop-item' + (state.armor >= a.val ? ' owned' : '');
+        row.innerHTML = '<div><div class="shop-item-name">' + a.label + '</div><div class="shop-item-sub">%50 Hasar Azaltma</div></div><div class="shop-price">' + a.cost + ' ¤</div>';
+        row.addEventListener('click', function () { buyArmor(a.val, a.cost); });
+        shopArmorsEl.appendChild(row);
+      });
+    }
+
+    function renderAgentSelectGrid() {
+      if (!agentGridEl) return;
+      var html = '';
+      for (var i = 0; i < AGENT_KEYS.length; i++) {
+        var key = AGENT_KEYS[i];
+        var ag = AGENT_PROFILES[key];
+        var sel = state.selectedAgent === key ? ' selected' : '';
+        var borderStyle = state.selectedAgent === key ? ' style="border-color:' + ag.badgeColor + '"' : '';
+        html += '<div class="agent-card' + sel + '" data-agent="' + key + '"' + borderStyle + '>' +
+                '<div class="agent-card-dot" style="background:' + ag.badgeColor + '"></div>' +
+                '<div class="agent-card-name">' + ag.name + '</div>' +
+                '<div class="agent-card-role">' + ag.role + '</div>' +
+                '</div>';
+      }
+      agentGridEl.innerHTML = html;
+
+      var cards = agentGridEl.querySelectorAll('.agent-card');
+      for (var j = 0; j < cards.length; j++) {
+        cards[j].addEventListener('click', function () {
+          selectPlayerAgent(this.getAttribute('data-agent'));
+        });
+      }
+    }
+
+    function selectPlayerAgent(key) {
+      if (!AGENT_PROFILES[key]) return;
+      state.selectedAgent = key;
+      var ag = AGENT_PROFILES[key];
+      selectedDescEl.textContent = ag.desc;
+      playerAgentTagEl.textContent = ag.name;
+      playerAgentTagEl.style.color = ag.badgeColor;
+      nameQEl.textContent = ag.qName;
+      nameEEl.textContent = ag.eName;
+      startBtn.textContent = state.hasStartedOnce
+        ? 'DEVAM ET (' + ag.name + ')'
+        : 'LOCK IN & DEPLOY RANDOM MAP (' + ag.name + ')';
+      renderAgentSelectGrid();
+    }
+
+    var bots = [];
+    var botHitMeshes = [];
+
+    function updateLineupHUD() {
+      var html = '';
+      for (var i = 0; i < bots.length; i++) {
+        var b = bots[i];
+        var cls = b.alive ? 'agent-chip' : 'agent-chip dead';
+        var stLabel = b.alive ? 'CANLI' : 'ÖLÜ';
+        html += '<div class="' + cls + '" style="border-color:' + b.profile.badgeColor + '">' +
+                '<span class="chip-dot" style="background:' + b.profile.badgeColor + '"></span>' +
+                '<span class="chip-name">' + b.profile.name + '</span>' +
+                '<span class="chip-state">' + stLabel + '</span>' +
+                '</div>';
+      }
+      lineupBarEl.innerHTML = html;
+    }
+
+    function updateHUD() {
+      var wpnKey = getEquippedWeaponKey();
+      var w = wpnKey ? WEAPONS[wpnKey] : null;
+      var am = wpnKey ? ammoStore[wpnKey] : null;
+
+      hpEl.textContent = Math.max(0, Math.ceil(state.hp));
+      hpEl.parentElement.classList.toggle('low-hp', state.hp <= 30);
+      armorEl.textContent = Math.max(0, Math.ceil(state.armor));
+      creditsEl.textContent = state.credits;
+
+      chip1El.textContent = '[1] ' + WEAPONS[state.slot1Weapon].name.replace('SOVEREIGN ', '').replace('REAVER ', '');
+      chip2El.textContent = '[2] ' + (state.slot2Weapon ? WEAPONS[state.slot2Weapon].name.replace('KURONAMI ', '').replace('RGX ', '').replace('PRIME ', '') : 'BOŞ');
+      chip3El.textContent = '[3] BIÇAK';
+
+      chip1El.classList.toggle('active', state.activeSlot === 1);
+      chip2El.classList.toggle('active', state.activeSlot === 2);
+      chip3El.classList.toggle('active', state.activeSlot === 3);
+
+      ctScoreEl.textContent = state.ctScore;
+      tScoreEl.textContent = state.tScore;
+      roundNumEl.textContent = state.roundNum;
+      if (mapBadgeTextEl) mapBadgeTextEl.textContent = state.currentMap;
+      if (mmMapCodeEl && MAPS[state.currentMap]) mmMapCodeEl.textContent = MAPS[state.currentMap].code;
+      var aliveBots = bots.filter(function (b) { return b.alive; }).length;
+      enemyCountEl.textContent = aliveBots;
+
+      if (state.goldenBulletReady) {
+        weaponNameEl.textContent = 'CHAMBER HEADHUNTER [1-SHOT]';
+        weaponNameEl.style.color = '#fbbf24';
+        weaponDmgBadgeEl.textContent = 'DMG 160 / 160';
+        weaponSilhouetteEl.style.width = '115px';
+        weaponModeEl.textContent = 'GOLDEN BULLET • LMB ATEŞ';
+        magEl.textContent = '1';
+        resEl.textContent = '∞';
+      } else if (!w) {
+        weaponNameEl.textContent = 'SLOT 2 BOŞ';
+        weaponNameEl.style.color = '#94a3b8';
+        weaponDmgBadgeEl.textContent = 'BOŞ SLOT';
+        weaponSilhouetteEl.style.width = '40px';
+        weaponModeEl.textContent = 'B MARKETTEN SİLAH AL';
+        magEl.textContent = '0';
+        resEl.textContent = '0';
+      } else {
+        weaponNameEl.textContent = w.name;
+        weaponNameEl.style.color = '#fbbf24';
+        weaponDmgBadgeEl.textContent = 'DMG ' + w.bodyDmg + ' / ' + w.headDmg;
+        var silWidth = w.fireMode === 'melee' ? 62 : (w.slot === 1 ? 82 : Math.min(142, Math.round(92 + w.barrelLen * 85)));
+        weaponSilhouetteEl.style.width = silWidth + 'px';
+        weaponModeEl.textContent = w.modeLabel + (state.isScoped ? ' • DÜRBÜN AÇIK' : '');
+        if (w.fireMode === 'melee') {
+          magEl.textContent = '∞';
+          resEl.textContent = '—';
+        } else {
+          magEl.textContent = am.mag;
+          resEl.textContent = am.reserve;
+        }
+      }
+
+      updateLineupHUD();
+      drawMinimap();
+    }
+
+    function updateAbilityHUD() {
+      if (state.qCooldown > 0) {
+        slotQEl.classList.add('cooldown');
+        cdQEl.textContent = state.qCooldown.toFixed(1) + 's';
+      } else {
+        slotQEl.classList.remove('cooldown');
+        cdQEl.textContent = 'READY';
+      }
+
+      if (state.eCooldown > 0) {
+        slotEEl.classList.add('cooldown');
+        cdEEl.textContent = state.eCooldown.toFixed(1) + 's';
+      } else {
+        slotEEl.classList.remove('cooldown');
+        cdEEl.textContent = 'READY';
+      }
+    }
+
+    function showBanner(text, duration) {
+      if (duration === undefined) duration = 2200;
+      bannerEl.textContent = text;
+      bannerEl.classList.remove('hidden');
+      if (duration > 0) {
+        clearTimeout(bannerEl._timer);
+        bannerEl._timer = setTimeout(function () {
+          bannerEl.classList.add('hidden');
+        }, duration);
+      }
+    }
+
+    function flashSkillTint(rgbaColor, ms) {
+      skillTintEl.style.background = rgbaColor;
+      clearTimeout(skillTintEl._timer);
+      skillTintEl._timer = setTimeout(function () {
+        skillTintEl.style.background = 'rgba(0,0,0,0)';
+      }, ms || 260);
+    }
+
+    function addKillfeed(text, isHeadshot) {
+      var wpnKey = getEquippedWeaponKey();
+      var wLabel = state.goldenBulletReady ? 'HEADHUNTER' : (wpnKey ? WEAPONS[wpnKey].name : 'SKILL');
+      var item = document.createElement('div');
+      item.className = 'kill-entry';
+      item.innerHTML = isHeadshot
+        ? state.selectedAgent + ' <span class="hs">[⌖ HEADSHOT]</span> ' + text + ' (' + wLabel + ') +200¤'
+        : state.selectedAgent + ' [' + wLabel + '] ' + text + ' +200¤';
+      killfeedEl.appendChild(item);
+      setTimeout(function () {
+        item.remove();
+      }, 3500);
+    }
+
+    function rewardKill(bot, isHeadshot) {
+      state.credits += 200;
+      addKillfeed(bot.name, isHeadshot);
+    }
+
+    function areaDamageToBots(centerPos, radius, dmg, stunSeconds, colorHex) {
+      var hitAny = false;
+      bots.forEach(function (bot) {
+        if (!bot.alive) return;
+        var dist = bot.group.position.distanceTo(centerPos);
+        if (dist <= radius) {
+          hitAny = true;
+          bot.hp -= dmg;
+          if (stunSeconds > 0) bot.stunTimer = stunSeconds;
+          spawnImpact(bot.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)), colorHex);
+          if (bot.hp <= 0 && bot.alive) {
+            bot.alive = false;
+            bot.group.visible = false;
+            rewardKill(bot, false);
+          }
+        }
+      });
+      if (hitAny) {
+        AudioFX.playHit(false);
+        triggerHitmarker(false);
+        updateHUD();
+        checkRoundEnd();
+      }
+    }
+
+    function castPlayerQ() {
+      if (!state.inMatch || state.isPaused || state.isShopOpen || !state.roundActive || state.qCooldown > 0) return;
+      var ag = AGENT_PROFILES[state.selectedAgent];
+      state.qCooldown = ag.qCdMax;
+      AudioFX.playSkill(560);
+
+      var forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      var targetSpot = playerPos.clone().addScaledVector(forward, 11);
+
+      if (ag.name === 'JETT') {
+        state.velocity.y = 11.2;
+        state.canJump = false;
+        flashSkillTint('rgba(45, 212, 191, 0.18)', 250);
+        showBanner('JETT // UPDRAFT!', 900);
+      } else if (ag.name === 'CLOVE') {
+        spawnTracer(camera.position.clone(), targetSpot, 0xf472b6);
+        areaDamageToBots(targetSpot, 7.5, 45, 2.2, 0xf472b6);
+        showBanner('CLOVE // MEDDLE!', 900);
+      } else if (ag.name === 'NEON') {
+        spawnTracer(camera.position.clone(), targetSpot, 0x38bdf8);
+        areaDamageToBots(targetSpot, 7.0, 40, 2.5, 0x38bdf8);
+        showBanner('NEON // RELAY BOLT!', 900);
+      } else if (ag.name === 'REYNA') {
+        areaDamageToBots(playerPos, 18.0, 25, 2.8, 0xc084fc);
+        flashSkillTint('rgba(192, 132, 252, 0.2)', 300);
+        showBanner('REYNA // LEER BLIND!', 900);
+      } else if (ag.name === 'CHAMBER') {
+        state.goldenBulletReady = true;
+        updateHUD();
+        flashSkillTint('rgba(251, 191, 36, 0.18)', 300);
+        showBanner('CHAMBER // HEADHUNTER READY!', 1100);
+      } else if (ag.name === 'RAZE') {
+        spawnTracer(camera.position.clone(), targetSpot, 0xfb923c);
+        areaDamageToBots(targetSpot, 8.5, 75, 0.8, 0xfb923c);
+        showBanner('RAZE // PAINT SHELLS!', 900);
+      } else if (ag.name === 'OMEN') {
+        spawnTracer(camera.position.clone(), targetSpot, 0x60a5fa);
+        areaDamageToBots(targetSpot, 9.0, 30, 3.0, 0x60a5fa);
+        showBanner('OMEN // PARANOIA!', 900);
+      } else if (ag.name === 'BREACH') {
+        spawnTracer(camera.position.clone(), targetSpot, 0xea580c);
+        areaDamageToBots(targetSpot, 8.0, 65, 2.0, 0xea580c);
+        showBanner('BREACH // AFTERSHOCK!', 900);
+      }
+      updateAbilityHUD();
+    }
+
+    function castPlayerE() {
+      if (!state.inMatch || state.isPaused || state.isShopOpen || !state.roundActive || state.eCooldown > 0) return;
+      var ag = AGENT_PROFILES[state.selectedAgent];
+      state.eCooldown = ag.eCdMax;
+      AudioFX.playSkill(720);
+
+      var flatForward = new THREE.Vector3(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
+
+      if (ag.name === 'JETT') {
+        playerPos.addScaledVector(flatForward, 6.5);
+        resolveHorizontalCollisions(playerPos, PLAYER_RADIUS, state.currentEyeHeight);
+        flashSkillTint('rgba(45, 212, 191, 0.22)', 220);
+        showBanner('JETT // TAILWIND DASH!', 900);
+      } else if (ag.name === 'CLOVE') {
+        state.hp = Math.min(100, state.hp + 45);
+        state.armor = Math.min(100, state.armor + 35);
+        updateHUD();
+        flashSkillTint('rgba(244, 114, 182, 0.22)', 300);
+        showBanner('CLOVE // PICK-ME-UP HEAL!', 900);
+      } else if (ag.name === 'NEON') {
+        state.speedBuffTimer = 4.0;
+        flashSkillTint('rgba(56, 189, 248, 0.2)', 350);
+        showBanner('NEON // HIGH GEAR!', 900);
+      } else if (ag.name === 'REYNA') {
+        state.hp = Math.min(100, state.hp + 40);
+        state.speedBuffTimer = 2.8;
+        updateHUD();
+        flashSkillTint('rgba(192, 132, 252, 0.25)', 350);
+        showBanner('REYNA // DISMISS!', 900);
+      } else if (ag.name === 'CHAMBER') {
+        playerPos.addScaledVector(flatForward, -7.5);
+        resolveHorizontalCollisions(playerPos, PLAYER_RADIUS, state.currentEyeHeight);
+        flashSkillTint('rgba(251, 191, 36, 0.22)', 240);
+        showBanner('CHAMBER // RENDEZVOUS TP!', 900);
+      } else if (ag.name === 'RAZE') {
+        playerPos.addScaledVector(flatForward, 5.5);
+        state.velocity.y = 9.0;
+        state.canJump = false;
+        resolveHorizontalCollisions(playerPos, PLAYER_RADIUS, state.currentEyeHeight);
+        areaDamageToBots(playerPos, 6.0, 45, 0.6, 0xfb923c);
+        showBanner('RAZE // BLAST PACK!', 900);
+      } else if (ag.name === 'OMEN') {
+        playerPos.addScaledVector(flatForward, 8.5);
+        resolveHorizontalCollisions(playerPos, PLAYER_RADIUS, state.currentEyeHeight);
+        flashSkillTint('rgba(96, 165, 250, 0.26)', 260);
+        showBanner('OMEN // SHROUDED STEP!', 900);
+      } else if (ag.name === 'BREACH') {
+        var lineSpot = playerPos.clone().addScaledVector(flatForward, 10);
+        areaDamageToBots(lineSpot, 9.5, 35, 3.2, 0xea580c);
+        flashSkillTint('rgba(234, 88, 12, 0.2)', 260);
+        showBanner('BREACH // FAULT LINE!', 900);
+      }
+      updateAbilityHUD();
+    }
+
+    function buildAgentRig(botRef, profile) {
+      var p = profile.palette;
+      var matSkin = new THREE.MeshStandardMaterial({ color: p.skin, roughness: 0.56, metalness: 0.04 });
+      var matHair = new THREE.MeshStandardMaterial({ color: p.hair, map: textures.tacticalFabric, roughness: 0.44, metalness: 0.12 });
+      var matPrimary = new THREE.MeshStandardMaterial({ color: p.primary, map: textures.tacticalFabric, roughness: 0.52, metalness: 0.24 });
+      var matSecondary = new THREE.MeshStandardMaterial({ color: p.secondary, map: textures.brushedMetal, roughness: 0.36, metalness: 0.65 });
+      var matAccent = new THREE.MeshStandardMaterial({ color: p.accent, emissive: p.accent, emissiveIntensity: 0.32, roughness: 0.24, metalness: 0.62 });
+      var matPants = new THREE.MeshStandardMaterial({ color: p.pants, map: textures.tacticalFabric, roughness: 0.72, metalness: 0.14 });
+      var matBoot = new THREE.MeshStandardMaterial({ color: 0x12151b, map: textures.carbonGrip, roughness: 0.52, metalness: 0.35 });
+      var matBotGun = new THREE.MeshStandardMaterial({ color: 0x1a1f26, map: textures.brushedMetal, roughness: 0.25, metalness: 0.88 });
+      var matBotGunTrim = new THREE.MeshStandardMaterial({ color: p.accent, roughness: 0.2, metalness: 0.85 });
+
+      var root = new THREE.Group();
+
+      var neck = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.096, 0.11, 14), matSkin);
+      neck.position.set(0, 1.49, 0);
+      neck.castShadow = true;
+      root.add(neck);
+
+      var head = new THREE.Mesh(new THREE.SphereGeometry(0.165, 18, 16), matSkin);
+      head.scale.set(0.92, 1.06, 0.98);
+      head.position.set(0, 1.67, 0);
+      head.castShadow = true;
+      head.userData = { bot: botRef, isHead: true };
+      root.add(head);
+
+      var jaw = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.09, 0.17), matSkin);
+      jaw.position.set(0, 1.57, 0.015);
+      jaw.userData = { bot: botRef, isHead: true };
+      root.add(jaw);
+
+      if (p.style === 'bun') {
+        var bun = new THREE.Mesh(new THREE.SphereGeometry(0.105, 14, 14), matHair);
+        bun.position.set(0, 1.89, -0.055);
+        bun.castShadow = true;
+        var hairTie = new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.012, 10, 16), matAccent);
+        hairTie.position.set(0, 1.83, -0.035);
+        hairTie.rotation.x = Math.PI / 2;
+        var cap = new THREE.Mesh(new THREE.SphereGeometry(0.172, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), matHair);
+        cap.position.set(0, 1.68, -0.008);
+        cap.castShadow = true;
+        root.add(bun, hairTie, cap);
+      } else if (p.style === 'horns') {
+        var hCap = new THREE.Mesh(new THREE.SphereGeometry(0.172, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), matHair);
+        hCap.position.set(0, 1.68, -0.005);
+        var hornL = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.15, 10), matSecondary);
+        hornL.position.set(-0.11, 1.86, 0.04);
+        hornL.rotation.z = 0.24;
+        var hornR = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.15, 10), matSecondary);
+        hornR.position.set(0.11, 1.86, 0.04);
+        hornR.rotation.z = -0.24;
+        root.add(hCap, hornL, hornR);
+      } else if (p.style === 'pigtails') {
+        var pigL = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.28, 12), matHair);
+        pigL.position.set(-0.21, 1.72, -0.03);
+        pigL.rotation.z = 0.35;
+        var pigR = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.28, 12), matHair);
+        pigR.position.set(0.21, 1.72, -0.03);
+        pigR.rotation.z = -0.35;
+        var nCap = new THREE.Mesh(new THREE.SphereGeometry(0.172, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), matHair);
+        nCap.position.set(0, 1.68, 0);
+        root.add(pigL, pigR, nCap);
+      } else if (p.style === 'long') {
+        var rHair = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.46, 0.12), matHair);
+        rHair.position.set(0, 1.54, -0.14);
+        rHair.castShadow = true;
+        var rTip = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.15, 0.10), matAccent);
+        rTip.position.set(0, 1.28, -0.14);
+        var rCrown = new THREE.Mesh(new THREE.SphereGeometry(0.172, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), matHair);
+        rCrown.position.set(0, 1.68, -0.01);
+        root.add(rHair, rTip, rCrown);
+      } else if (p.style === 'cap') {
+        var rCap = new THREE.Mesh(new THREE.SphereGeometry(0.172, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), matSecondary);
+        rCap.position.set(0, 1.69, 0.01);
+        var rBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.19, 0.02, 16, 1, false, -Math.PI * 0.45, Math.PI * 0.9), matAccent);
+        rBrim.position.set(0, 1.74, 0.05);
+        root.add(rCap, rBrim);
+      } else if (p.style === 'hood') {
+        var hood = new THREE.Mesh(new THREE.SphereGeometry(0.205, 16, 14), matPrimary);
+        hood.scale.set(1.05, 1.08, 1.08);
+        hood.position.set(0, 1.68, -0.015);
+        hood.castShadow = true;
+        var eyeGlowL = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.026, 0.025), matAccent);
+        eyeGlowL.position.set(-0.058, 1.66, 0.175);
+        var eyeGlowR = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.026, 0.025), matAccent);
+        eyeGlowR.position.set(0.058, 1.66, 0.175);
+        root.add(hood, eyeGlowL, eyeGlowR);
+      } else {
+        var sHair = new THREE.Mesh(new THREE.SphereGeometry(0.172, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), matHair);
+        sHair.position.set(0, 1.68, -0.005);
+        root.add(sHair);
+      }
+
+      var shoulderBar = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.135, 0.54, 14), matPrimary);
+      shoulderBar.rotation.z = Math.PI / 2;
+      shoulderBar.position.set(0, 1.38, 0);
+      shoulderBar.castShadow = true;
+      root.add(shoulderBar);
+
+      var torso = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.58, 0.28), matPrimary);
+      torso.position.set(0, 1.13, 0);
+      torso.castShadow = true;
+      torso.userData = { bot: botRef, isHead: false };
+      root.add(torso);
+
+      var pelvis = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.20, 0.16, 14), matPants);
+      pelvis.scale.set(1.12, 1, 0.76);
+      pelvis.position.set(0, 0.80, 0);
+      pelvis.castShadow = true;
+      root.add(pelvis);
+
+      var chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.30, 0.06), matSecondary);
+      chestPlate.position.set(0, 1.23, 0.145);
+      chestPlate.castShadow = true;
+      root.add(chestPlate);
+
+      var backPack = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.40, 0.13), matSecondary);
+      backPack.position.set(0, 1.18, -0.185);
+      backPack.castShadow = true;
+      root.add(backPack);
+
+      var core = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.03), matAccent);
+      core.position.set(0, 1.22, 0.175);
+      root.add(core);
+
+      var belt = new THREE.Mesh(new THREE.CylinderGeometry(0.245, 0.245, 0.08, 16), matBoot);
+      belt.scale.set(1.12, 1, 0.78);
+      belt.position.set(0, 0.84, 0);
+      var beltBuckle = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.085, 0.025), matAccent);
+      beltBuckle.position.set(0, 0.84, 0.185);
+      root.add(belt, beltBuckle);
+
+      var leftArmPivot = new THREE.Group();
+      leftArmPivot.position.set(-0.34, 1.36, 0);
+      var lShoulderJoint = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 12), matSecondary);
+      var lPauldron = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.11, 0.14, 12), matSecondary);
+      lPauldron.position.set(-0.02, -0.03, 0);
+      lPauldron.rotation.z = 0.22;
+      var lUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.06, 0.26, 12), profile.name === 'BREACH' ? matSecondary : matSkin);
+      lUpperArm.position.y = -0.15;
+      lUpperArm.castShadow = true;
+      var lElbowJoint = new THREE.Mesh(new THREE.SphereGeometry(0.058, 10, 10), matBoot);
+      lElbowJoint.position.y = -0.28;
+      var lForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.048, 0.24, 12), profile.name === 'BREACH' ? matSecondary : matSkin);
+      lForearm.position.y = -0.40;
+      lForearm.castShadow = true;
+      var lGlove = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.12), matBoot);
+      lGlove.position.y = -0.52;
+      leftArmPivot.add(lShoulderJoint, lPauldron, lUpperArm, lElbowJoint, lForearm, lGlove);
+      root.add(leftArmPivot);
+
+      var rightArmPivot = new THREE.Group();
+      rightArmPivot.position.set(0.34, 1.36, 0);
+      var rShoulderJoint = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 12), matSecondary);
+      var rPauldron = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.11, 0.14, 12), matSecondary);
+      rPauldron.position.set(0.02, -0.03, 0);
+      rPauldron.rotation.z = -0.22;
+      var rUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.06, 0.26, 12), profile.name === 'BREACH' ? matSecondary : matSkin);
+      rUpperArm.position.y = -0.15;
+      rUpperArm.castShadow = true;
+      var rElbowJoint = new THREE.Mesh(new THREE.SphereGeometry(0.058, 10, 10), matBoot);
+      rElbowJoint.position.y = -0.28;
+      var rForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.048, 0.24, 12), profile.name === 'BREACH' ? matSecondary : matSkin);
+      rForearm.position.y = -0.40;
+      rForearm.castShadow = true;
+      var rGlove = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.12), matBoot);
+      rGlove.position.y = -0.52;
+
+      var botGunGroup = new THREE.Group();
+      botGunGroup.position.set(0, -0.46, 0.08);
+      var botGun = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.078, 0.48), matBotGun);
+      botGun.position.set(0, 0.02, 0.18);
+      var botGunBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.24, 10), matBotGunTrim);
+      botGunBarrel.rotation.x = Math.PI / 2;
+      botGunBarrel.position.set(0, 0.03, 0.48);
+      var botGunMag = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.14, 0.068), matBotGun);
+      botGunMag.position.set(0, -0.07, 0.22);
+      botGunMag.rotation.x = -0.18;
+      botGunGroup.add(botGun, botGunBarrel, botGunMag);
+      rightArmPivot.add(rShoulderJoint, rPauldron, rUpperArm, rElbowJoint, rForearm, rGlove, botGunGroup);
+      root.add(rightArmPivot);
+
+      var leftLegPivot = new THREE.Group();
+      leftLegPivot.position.set(-0.135, 0.75, 0);
+      var lThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.098, 0.082, 0.34, 12), matPants);
+      lThigh.position.y = -0.17;
+      lThigh.castShadow = true;
+      lThigh.userData = { bot: botRef, isHead: false };
+      var lKnee = new THREE.Mesh(new THREE.SphereGeometry(0.078, 10, 10), matSecondary);
+      lKnee.position.set(0, -0.34, 0.02);
+      var lShin = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.064, 0.28, 12), matPants);
+      lShin.position.y = -0.48;
+      lShin.castShadow = true;
+      lShin.userData = { bot: botRef, isHead: false };
+      var lBoot = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.15, 0.26), matBoot);
+      lBoot.position.set(0, -0.675, 0.035);
+      lBoot.castShadow = true;
+      leftLegPivot.add(lThigh, lKnee, lShin, lBoot);
+      root.add(leftLegPivot);
+
+      var rightLegPivot = new THREE.Group();
+      rightLegPivot.position.set(0.135, 0.75, 0);
+      var rThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.098, 0.082, 0.34, 12), matPants);
+      rThigh.position.y = -0.17;
+      rThigh.castShadow = true;
+      rThigh.userData = { bot: botRef, isHead: false };
+      var rKnee = new THREE.Mesh(new THREE.SphereGeometry(0.078, 10, 10), matSecondary);
+      rKnee.position.set(0, -0.34, 0.02);
+      var rShin = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.064, 0.28, 12), matPants);
+      rShin.position.y = -0.48;
+      rShin.castShadow = true;
+      rShin.userData = { bot: botRef, isHead: false };
+      var rBoot = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.15, 0.26), matBoot);
+      rBoot.position.set(0, -0.675, 0.035);
+      rBoot.castShadow = true;
+      rightLegPivot.add(rThigh, rKnee, rShin, rBoot);
+      root.add(rightLegPivot);
+
+      return {
+        group: root,
+        head: head,
+        torso: torso,
+        leftLegPivot: leftLegPivot,
+        rightLegPivot: rightLegPivot,
+        leftArmPivot: leftArmPivot,
+        rightArmPivot: rightArmPivot,
+        hitMeshes: [head, jaw, torso, lThigh, lShin, rThigh, rShin]
+      };
+    }
+
+    function pickRandomLineup(count) {
+      var pool = AGENT_KEYS.slice();
+      for (var i = pool.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = pool[i];
+        pool[i] = pool[j];
+        pool[j] = tmp;
+      }
+      return pool.slice(0, count);
+    }
+
+    function createBot(index, spawnPos, profileKey) {
+      var profile = AGENT_PROFILES[profileKey];
+      var bot = {
+        id: index + 1,
+        profile: profile,
+        name: profile.name + ' #0' + (index + 1),
+        group: null,
+        head: null,
+        torso: null,
+        leftLegPivot: null,
+        rightLegPivot: null,
+        leftArmPivot: null,
+        rightArmPivot: null,
+        hp: profile.hp,
+        maxHp: profile.hp,
+        alive: true,
+        stunTimer: 0,
+        shootCooldown: 0.9 + Math.random() * 1.4,
+        skillCooldown: 3.0 + Math.random() * profile.skillCooldown,
+        strafeDir: Math.random() > 0.5 ? 1 : -1,
+        strafeTimer: 1 + Math.random() * 2,
+        walkCycle: Math.random() * Math.PI * 2
+      };
+
+      var rig = buildAgentRig(bot, profile);
+      rig.group.position.copy(spawnPos);
+      scene.add(rig.group);
+
+      bot.group = rig.group;
+      bot.head = rig.head;
+      bot.torso = rig.torso;
+      bot.leftLegPivot = rig.leftLegPivot;
+      bot.rightLegPivot = rig.rightLegPivot;
+      bot.leftArmPivot = rig.leftArmPivot;
+      bot.rightArmPivot = rig.rightArmPivot;
+
+      rig.hitMeshes.forEach(function (m) {
+        botHitMeshes.push(m);
+      });
+      bots.push(bot);
+    }
+
+    function spawnAllBots() {
+      bots.forEach(function (b) { scene.remove(b.group); });
+      bots.length = 0;
+      botHitMeshes.length = 0;
+      var chosen = pickRandomLineup(botSpawnPoints.length);
+      botSpawnPoints.forEach(function (pt, idx) {
+        createBot(idx, pt, chosen[idx]);
+      });
+    }
+
+    var tracers = [];
+    var particles = [];
+
+    function spawnTracer(start, end, color) {
+      if (color === undefined) color = 0xffe066;
+      var geo = new THREE.BufferGeometry().setFromPoints([start, end]);
+      var mat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.85 });
+      var line = new THREE.Line(geo, mat);
+      scene.add(line);
+      tracers.push({ line: line, life: 0.08 });
+    }
+
+    function spawnImpact(point, colorHex) {
+      var count = 6;
+      var mat = new THREE.MeshBasicMaterial({ color: colorHex || 0xfbbf24 });
+      var geo = new THREE.BoxGeometry(0.06, 0.06, 0.06);
+      for (var i = 0; i < count; i++) {
+        var mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(point);
+        var vel = new THREE.Vector3(
+          (Math.random() - 0.5) * 4,
+          Math.random() * 3.5 + 1,
+          (Math.random() - 0.5) * 4
+        );
+        scene.add(mesh);
+        particles.push({ mesh: mesh, vel: vel, life: 0.35 });
+      }
+    }
+
+    var raycaster = new THREE.Raycaster();
+
+    function triggerHitmarker(isHeadshot) {
+      hitmarkerEl.classList.add('active');
+      hitmarkerEl.classList.toggle('headshot', isHeadshot);
+      clearTimeout(hitmarkerEl._timer);
+      hitmarkerEl._timer = setTimeout(function () {
+        hitmarkerEl.classList.remove('active', 'headshot');
+      }, 140);
+    }
+
+    function reloadWeapon() {
+      var wpnKey = getEquippedWeaponKey();
+      if (!wpnKey || wpnKey === 'KNIFE') return;
+      var w = WEAPONS[wpnKey];
+      var am = ammoStore[wpnKey];
+      if (state.isReloading || am.mag === w.magSize || am.reserve <= 0 || !state.roundActive) return;
+      state.isReloading = true;
+      if (state.isScoped) setScopeState(false);
+      AudioFX.playReload();
+      showBanner('RELOADING ' + w.name + '...', Math.round(w.reloadTime * 1000));
+
+      setTimeout(function () {
+        var needed = w.magSize - am.mag;
+        var transfer = Math.min(needed, am.reserve);
+        am.mag += transfer;
+        am.reserve -= transfer;
+        state.isReloading = false;
+        updateHUD();
+      }, Math.round(w.reloadTime * 1000));
+    }
+
+    function fireWeapon(nowSeconds) {
+      if (!state.inMatch || state.isPaused || state.isShopOpen || !state.roundActive || state.isReloading) return;
+
+      var isGolden = state.goldenBulletReady;
+      var wpnKey = getEquippedWeaponKey();
+      if (!isGolden && !wpnKey) return;
+
+      var w = isGolden ? {
+        fireMode: 'semi',
+        fireRate: 0.25,
+        bodyDmg: 160,
+        headDmg: 160,
+        spreadBase: 0,
+        recoilStep: 0.025,
+        pitchMult: 0.72,
+        heavy: true,
+        accent: 0xfbbf24
+      } : WEAPONS[wpnKey];
+
+      if ((w.fireMode === 'semi' || w.fireMode === 'bolt' || w.fireMode === 'melee') && state.semiFiredThisPress) {
+        return;
+      }
+
+      if (nowSeconds - state.lastShotTime < w.fireRate) return;
+
+      var am = (!isGolden && w.fireMode !== 'melee') ? ammoStore[wpnKey] : null;
+      if (am && am.mag <= 0) {
+        reloadWeapon();
+        return;
+      }
+
+      if (w.fireMode === 'semi' || w.fireMode === 'bolt' || w.fireMode === 'melee') {
+        state.semiFiredThisPress = true;
+      }
+
+      if (isGolden) {
+        state.goldenBulletReady = false;
+      } else if (am) {
+        am.mag--;
+      }
+
+      state.lastShotTime = nowSeconds;
+      updateHUD();
+
+      if (w.fireMode === 'melee') {
+        AudioFX.playKnife();
+        weaponGroup.position.z -= 0.14;
+        weaponGroup.rotation.x = -0.35;
+      } else {
+        AudioFX.playShot(true, w.pitchMult, w.heavy);
+        muzzleFlash.material.opacity = 0.95;
+        muzzleFlash.rotation.z = Math.random() * Math.PI;
+        weaponGroup.position.z += w.heavy ? 0.095 : 0.06;
+        weaponGroup.rotation.x = w.heavy ? 0.11 : 0.065;
+      }
+
+      var horizSpeed = Math.hypot(state.velocity.x, state.velocity.z);
+      var movePenalty = horizSpeed > 0.5 ? (state.isScoped ? 0.006 : 0.022) : 0.001;
+      var jumpPenalty = !state.canJump ? 0.06 : 0;
+      var adsBonus = state.isScoped ? 0.45 : 1.0;
+      var totalSpread = (isGolden || w.fireMode === 'melee') ? 0 : ((w.spreadBase + movePenalty + jumpPenalty + state.spread) * adsBonus);
+
+      var dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      dir.x += (Math.random() - 0.5) * totalSpread;
+      dir.y += (Math.random() - 0.5) * totalSpread;
+      dir.z += (Math.random() - 0.5) * totalSpread;
+      dir.normalize();
+
+      raycaster.set(camera.position, dir);
+      raycaster.far = w.fireMode === 'melee' ? 2.6 : 250;
+
+      var aliveHitMeshes = botHitMeshes.filter(function (m) {
+        return m.userData && m.userData.bot && m.userData.bot.alive;
+      });
+      var targets = mapMeshes.concat(aliveHitMeshes);
+      var hits = raycaster.intersectObjects(targets, false);
+      raycaster.far = Infinity;
+
+      var muzzleWorldPos = new THREE.Vector3();
+      muzzleFlash.getWorldPosition(muzzleWorldPos);
+
+      if (hits.length > 0) {
+        var hit = hits[0];
+        if (w.fireMode !== 'melee') {
+          spawnTracer(muzzleWorldPos, hit.point, w.accent);
+        }
+
+        if (hit.object.userData && hit.object.userData.bot) {
+          var bot = hit.object.userData.bot;
+          var isHead = hit.object.userData.isHead;
+          var dmg = isHead ? w.headDmg : w.bodyDmg;
+          bot.hp -= dmg;
+
+          AudioFX.playHit(isHead || isGolden);
+          triggerHitmarker(isHead || isGolden);
+          spawnImpact(hit.point, bot.profile.hitColor);
+
+          if (bot.hp <= 0 && bot.alive) {
+            bot.alive = false;
+            bot.group.visible = false;
+            rewardKill(bot, isHead || isGolden);
+            updateHUD();
+            checkRoundEnd();
+          }
+        } else {
+          spawnImpact(hit.point, w.accent);
+        }
+      } else if (w.fireMode !== 'melee') {
+        var farEnd = camera.position.clone().addScaledVector(dir, 95);
+        spawnTracer(muzzleWorldPos, farEnd, w.accent);
+      }
+
+      if (w.fireMode !== 'melee') {
+        state.recoilPitch += w.recoilStep;
+        state.yaw += (Math.random() - 0.5) * (w.recoilStep * 0.65);
+        state.spread = Math.min(0.065, state.spread + w.recoilStep * 0.5);
+      }
+
+      if (am && am.mag === 0 && am.reserve > 0) {
+        reloadWeapon();
+      }
+    }
+
+    function damagePlayer(amount) {
+      if (!state.roundActive || state.hp <= 0) return;
+
+      var armorAbsorb = Math.min(state.armor, amount * 0.5);
+      state.armor -= armorAbsorb;
+      state.hp -= (amount - armorAbsorb);
+      updateHUD();
+
+      damageOverlayEl.style.boxShadow = 'inset 0 0 110px rgba(220, 38, 38, 0.75)';
+      clearTimeout(damageOverlayEl._timer);
+      damageOverlayEl._timer = setTimeout(function () {
+        damageOverlayEl.style.boxShadow = 'inset 0 0 90px rgba(220, 38, 38, 0)';
+      }, 220);
+
+      if (state.hp <= 0) {
+        state.roundActive = false;
+        state.tScore++;
+        state.credits += 1900;
+        updateHUD();
+        showBanner('OPERATIVE DOWN // TERRORISTS WIN ROUND (+1900¤)', 3000);
+        setTimeout(resetRound, 3200);
+      }
+    }
+
+    function checkRoundEnd() {
+      if (!state.roundActive) return;
+      var aliveBots = bots.filter(function (b) { return b.alive; }).length;
+      if (aliveBots === 0) {
+        state.roundActive = false;
+        state.ctScore++;
+        state.credits += 2500;
+        updateHUD();
+        showBanner('SECTOR SECURED // CT WIN ROUND (+2500¤)', 3000);
+        setTimeout(resetRound, 3200);
+      }
+    }
+
+    function resetRound() {
+      clearAllInputStates();
+      state.roundNum++;
+      state.roundActive = true;
+      var playerAg = AGENT_PROFILES[state.selectedAgent];
+      state.hp = playerAg.hp;
+      Object.keys(WEAPONS).forEach(function (k) {
+        ammoStore[k].mag = WEAPONS[k].magSize;
+        ammoStore[k].reserve = WEAPONS[k].reserveSize;
+      });
+      state.isReloading = false;
+      state.semiFiredThisPress = false;
+      state.qCooldown = 0;
+      state.eCooldown = 0;
+      state.speedBuffTimer = 0;
+      state.goldenBulletReady = false;
+      if (state.isScoped) setScopeState(false);
+      state.velocity.set(0, 0, 0);
+      state.recoilPitch = 0;
+      state.spread = 0;
+
+      playerPos.set(0, 0, 32);
+      state.yaw = 0;
+      state.pitch = 0;
+
+      buildRandomOrSelectedMap(pickRandomMapKey());
+      spawnAllBots();
+      updateHUD();
+      updateAbilityHUD();
+      var lineupNames = bots.map(function (b) { return b.profile.name; }).join(' • ');
+      showBanner('HARİTA: ' + state.currentMap + ' // ROUND ' + state.roundNum + ' — ' + lineupNames, 2500);
+    }
+
+    function resolveHorizontalCollisions(pos, radius, height) {
+      var playerBox = new THREE.Box3(
+        new THREE.Vector3(pos.x - radius, pos.y + 0.1, pos.z - radius),
+        new THREE.Vector3(pos.x + radius, pos.y + height, pos.z + radius)
+      );
+
+      for (var i = 0; i < colliders.length; i++) {
+        var box = colliders[i];
+        if (playerBox.intersectsBox(box)) {
+          var overlapX1 = playerBox.max.x - box.min.x;
+          var overlapX2 = box.max.x - playerBox.min.x;
+          var overlapZ1 = playerBox.max.z - box.min.z;
+          var overlapZ2 = box.max.z - playerBox.min.z;
+
+          var minOverlapX = Math.min(overlapX1, overlapX2);
+          var minOverlapZ = Math.min(overlapZ1, overlapZ2);
+
+          if (minOverlapX < minOverlapZ) {
+            pos.x += overlapX1 < overlapX2 ? -overlapX1 : overlapX2;
+          } else {
+            pos.z += overlapZ1 < overlapZ2 ? -overlapZ1 : overlapZ2;
+          }
+
+          playerBox.min.set(pos.x - radius, pos.y + 0.1, pos.z - radius);
+          playerBox.max.set(pos.x + radius, pos.y + height, pos.z + radius);
+        }
+      }
+    }
+
+    function resolveVerticalCollisions(pos, radius, height) {
+      var groundY = 0;
+      var footBox = new THREE.Box3(
+        new THREE.Vector3(pos.x - radius * 0.85, pos.y - 0.05, pos.z - radius * 0.85),
+        new THREE.Vector3(pos.x + radius * 0.85, pos.y + height, pos.z + radius * 0.85)
+      );
+
+      for (var i = 0; i < colliders.length; i++) {
+        var box = colliders[i];
+        if (footBox.intersectsBox(box)) {
+          if (state.velocity.y <= 0 && pos.y >= box.max.y - 0.35) {
+            groundY = Math.max(groundY, box.max.y);
+          } else if (state.velocity.y > 0 && pos.y + height <= box.min.y + 0.35) {
+            pos.y = box.min.y - height;
+            state.velocity.y = 0;
+          }
+        }
+      }
+
+      if (pos.y <= groundY) {
+        pos.y = groundY;
+        state.velocity.y = 0;
+        state.canJump = true;
+      } else {
+        state.canJump = false;
+      }
+    }
+
+    function requestCanvasLock() {
+      try {
+        renderer.domElement.focus();
+        if (renderer.domElement.requestPointerLock) {
+          var promise = renderer.domElement.requestPointerLock();
+          if (promise && promise.catch) {
+            promise.catch(function () {});
+          }
+        }
+      } catch (err) {}
+    }
+
+    function enterMatchView() {
+      clearAllInputStates();
+      var rolledMap = pickRandomMapKey();
+      buildRandomOrSelectedMap(rolledMap);
+      spawnAllBots();
+      playerPos.set(0, 0, 32);
+      state.yaw = 0;
+      state.pitch = 0;
+      state.velocity.set(0, 0, 0);
+      updateHUD();
+      updateAbilityHUD();
+      showBanner('HARİTA: ' + state.currentMap + ' // ROUND ' + state.roundNum, 2200);
+
+      state.inMatch = true;
+      state.isPaused = false;
+      state.isShopOpen = false;
+      forceCloseOverlay();
+      if (pauseModalEl) pauseModalEl.classList.add('hidden');
+      if (shopModalEl) shopModalEl.classList.add('hidden');
+      applyCrosshairStyle(getCurrentPreset(), 0);
+      requestCanvasLock();
+    }
+
+    function togglePauseModal(forceOpen) {
+      if (!state.inMatch) return;
+      var nextOpen = forceOpen !== undefined ? forceOpen : !state.isPaused;
+      clearAllInputStates();
+      state.isPaused = nextOpen;
+      state.isShopOpen = false;
+      if (state.isScoped) setScopeState(false);
+
+      shopModalEl.classList.add('hidden');
+      if (nextOpen) {
+        renderCrosshairSettingsGrid();
+        pauseModalEl.classList.remove('hidden');
+        try { if (document.exitPointerLock) document.exitPointerLock(); } catch (e) {}
+      } else {
+        pauseModalEl.classList.add('hidden');
+        ensureHudAndCrosshairVisible();
+        applyCrosshairStyle(getCurrentPreset(), 0);
+        requestCanvasLock();
+      }
+    }
+
+    function toggleShopModal(forceOpen) {
+      if (!state.inMatch || state.isPaused) return;
+      var nextOpen = forceOpen !== undefined ? forceOpen : !state.isShopOpen;
+      clearAllInputStates();
+      state.isShopOpen = nextOpen;
+      if (state.isScoped) setScopeState(false);
+
+      if (nextOpen) {
+        renderShop();
+        shopModalEl.classList.remove('hidden');
+        try { if (document.exitPointerLock) document.exitPointerLock(); } catch (e) {}
+      } else {
+        shopModalEl.classList.add('hidden');
+        ensureHudAndCrosshairVisible();
+        applyCrosshairStyle(getCurrentPreset(), 0);
+        requestCanvasLock();
+      }
+    }
+
+    function openAgentSelectFromPause() {
+      clearAllInputStates();
+      state.inMatch = false;
+      state.isPaused = false;
+      state.isShopOpen = false;
+      pauseModalEl.classList.add('hidden');
+      shopModalEl.classList.add('hidden');
+      hudEl.classList.add('hidden');
+      hudEl.style.display = 'none';
+      selectPlayerAgent(state.selectedAgent);
+      overlayEl.classList.remove('hidden');
+      overlayEl.style.display = 'flex';
+    }
+
+    sensSliderEl.addEventListener('input', function () {
+      state.sensitivity = parseFloat(this.value) || 1.0;
+      sensValEl.textContent = state.sensitivity.toFixed(2);
+    });
+
+    resumeBtn.addEventListener('click', function () {
+      togglePauseModal(false);
+    });
+
+    agentMenuBtn.addEventListener('click', function () {
+      openAgentSelectFromPause();
+    });
+
+    closeShopBtn.addEventListener('click', function () {
+      toggleShopModal(false);
+    });
+
+    startBtn.addEventListener('click', function () {
+      AudioFX.init();
+      if (!state.hasStartedOnce) {
+        state.hasStartedOnce = true;
+        state.hp = AGENT_PROFILES[state.selectedAgent].hp;
+      }
+      enterMatchView();
+    });
+
+    window.addEventListener('blur', function () {
+      clearAllInputStates();
+    });
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        clearAllInputStates();
+      }
+    });
+
+    document.addEventListener('pointerlockchange', function () {
+      state.isLocked = document.pointerLockElement === renderer.domElement;
+      state.lastMouseX = null;
+      state.lastMouseY = null;
+    });
+
+    document.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+    });
+
+    function applyLookDelta(dx, dy) {
+      var scopeSens = state.isScoped ? (camera.fov / 75) : 1.0;
+      var sensitivity = 0.0028 * state.sensitivity * scopeSens;
+      state.yaw -= dx * sensitivity;
+      state.pitch -= dy * sensitivity;
+      var maxPitch = Math.PI / 2 - 0.05;
+      state.pitch = Math.max(-maxPitch, Math.min(maxPitch, state.pitch));
+    }
+
+    window.addEventListener('mousemove', function (e) {
+      if (!state.inMatch || state.isPaused || state.isShopOpen) return;
+      if (document.pointerLockElement === renderer.domElement) {
+        applyLookDelta(e.movementX || 0, e.movementY || 0);
+      } else {
+        if (state.lastMouseX !== null && state.lastMouseY !== null) {
+          var dx = (e.clientX - state.lastMouseX) * 1.65;
+          var dy = (e.clientY - state.lastMouseY) * 1.65;
+          applyLookDelta(dx, dy);
+        }
+        state.lastMouseX = e.clientX;
+        state.lastMouseY = e.clientY;
+      }
+    });
+
+    window.addEventListener('mousedown', function (e) {
+      if (!state.inMatch || state.isPaused || state.isShopOpen) return;
+      ensureHudAndCrosshairVisible();
+      if (document.pointerLockElement !== renderer.domElement) {
+        requestCanvasLock();
+      }
+      if (e.button === 0) {
+        isMouseDown = true;
+        state.semiFiredThisPress = false;
+      } else if (e.button === 2) {
+        setScopeState(!state.isScoped);
+        updateHUD();
+      }
+    });
+
+    window.addEventListener('mouseup', function (e) {
+      if (e.button === 0) {
+        isMouseDown = false;
+        state.semiFiredThisPress = false;
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.code) keys[e.code] = true;
+      if (e.key) keys['CHAR_' + e.key.toLowerCase()] = true;
+
+      if (e.code === 'Escape') {
+        if (state.isShopOpen) {
+          toggleShopModal(false);
+          return;
+        }
+        if (state.inMatch) {
+          togglePauseModal();
+          return;
+        }
+      }
+
+      if (!state.inMatch || state.isPaused) return;
+
+      var kLower = (e.key || '').toLowerCase();
+      if (e.code === 'KeyB' || kLower === 'b') {
+        toggleShopModal();
+        return;
+      }
+
+      if (state.isShopOpen) return;
+
+      if (e.code === 'KeyR' || kLower === 'r') reloadWeapon();
+      if (e.code === 'KeyQ' || kLower === 'q') castPlayerQ();
+      if (e.code === 'KeyE' || kLower === 'e') castPlayerE();
+      if (e.code === 'Digit1' || e.key === '1') switchSlot(1);
+      if (e.code === 'Digit2' || e.key === '2') switchSlot(2);
+      if (e.code === 'Digit3' || e.key === '3') switchSlot(3);
+      if ((e.code === 'Space' || e.key === ' ') && state.canJump) {
+        state.velocity.y = 7.4;
+        state.canJump = false;
+      }
+    });
+
+    document.addEventListener('keyup', function (e) {
+      if (e.code) keys[e.code] = false;
+      if (e.key) keys['CHAR_' + e.key.toLowerCase()] = false;
+    });
+
+    window.addEventListener('resize', function () {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function triggerBotAgentSkill(bot, playerEyePos, dist) {
+      var role = bot.profile.name;
+      AudioFX.playSkill(480);
+
+      if (role === 'JETT') {
+        bot.group.position.y = Math.min(3.2, bot.group.position.y + 1.8);
+        spawnImpact(bot.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0x2dd4bf);
+      } else if (role === 'CLOVE' || role === 'REYNA') {
+        bot.hp = Math.min(bot.maxHp, bot.hp + 30);
+        spawnImpact(bot.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)), bot.profile.hitColor);
+      } else if (role === 'OMEN') {
+        var jumpOffset = new THREE.Vector3((Math.random() - 0.5) * 7, 0, (Math.random() - 0.5) * 7);
+        bot.group.position.add(jumpOffset);
+        resolveHorizontalCollisions(bot.group.position, 0.45, 1.8);
+        spawnImpact(bot.group.position.clone().add(new THREE.Vector3(0, 1.1, 0)), 0x60a5fa);
+      } else if (role === 'RAZE' || role === 'BREACH') {
+        if (dist < 14) {
+          damagePlayer(12);
+          spawnImpact(playerEyePos, bot.profile.hitColor);
+        }
+      } else if (role === 'CHAMBER') {
+        if (dist < 45) {
+          damagePlayer(16);
+          spawnTracer(bot.group.position.clone().add(new THREE.Vector3(0, 1.5, 0)), playerEyePos, 0xfbbf24);
+        }
+      } else if (role === 'NEON') {
+        bot.strafeDir *= -1;
+        spawnImpact(bot.group.position.clone().add(new THREE.Vector3(0, 1, 0)), 0x38bdf8);
+      }
+    }
+
+    var aiRaycaster = new THREE.Raycaster();
+
+    function updateBots(dt) {
+      if (!state.roundActive) return;
+
+      var playerEyePos = new THREE.Vector3(playerPos.x, playerPos.y + state.currentEyeHeight - 0.2, playerPos.z);
+
+      bots.forEach(function (bot) {
+        if (!bot.alive) return;
+
+        if (bot.group.position.y > 0) {
+          bot.group.position.y = Math.max(0, bot.group.position.y - 4.5 * dt);
+        }
+
+        if (bot.stunTimer > 0) {
+          bot.stunTimer -= dt;
+          return;
+        }
+
+        var botEyePos = new THREE.Vector3(bot.group.position.x, bot.group.position.y + 1.55, bot.group.position.z);
+        var toPlayer = new THREE.Vector3().subVectors(playerEyePos, botEyePos);
+        var dist = toPlayer.length();
+        var dirToPlayer = toPlayer.clone().normalize();
+
+        var targetYaw = Math.atan2(dirToPlayer.x, dirToPlayer.z);
+        bot.group.rotation.y = targetYaw;
+
+        aiRaycaster.set(botEyePos, dirToPlayer);
+        var wallHits = aiRaycaster.intersectObjects(mapMeshes, false);
+        var hasLOS = wallHits.length === 0 || wallHits[0].distance > dist;
+
+        bot.strafeTimer -= dt;
+        if (bot.strafeTimer <= 0) {
+          bot.strafeDir *= -1;
+          bot.strafeTimer = 1.0 + Math.random() * 1.6;
+        }
+
+        bot.skillCooldown -= dt;
+        if (bot.skillCooldown <= 0) {
+          bot.skillCooldown = bot.profile.skillCooldown;
+          triggerBotAgentSkill(bot, playerEyePos, dist);
+        }
+
+        var forward = new THREE.Vector3(Math.sin(targetYaw), 0, Math.cos(targetYaw));
+        var right = new THREE.Vector3(Math.cos(targetYaw), 0, -Math.sin(targetYaw));
+        var moveStep = new THREE.Vector3();
+        var baseSpeed = 3.5 * bot.profile.speedMult;
+
+        if (!hasLOS || dist > 16) {
+          moveStep.addScaledVector(forward, baseSpeed * dt);
+        }
+        if (hasLOS) {
+          moveStep.addScaledVector(right, bot.strafeDir * (2.4 * bot.profile.speedMult) * dt);
+        }
+
+        bot.group.position.add(moveStep);
+        resolveHorizontalCollisions(bot.group.position, 0.45, 1.8);
+
+        var moveLen = moveStep.length();
+        if (moveLen > 0.001) {
+          bot.walkCycle += dt * (10 * bot.profile.speedMult);
+          var swing = Math.sin(bot.walkCycle) * 0.55;
+          bot.leftLegPivot.rotation.x = swing;
+          bot.rightLegPivot.rotation.x = -swing;
+          bot.leftArmPivot.rotation.x = -swing * 0.6;
+          bot.torso.position.y = 1.13 + Math.abs(Math.cos(bot.walkCycle)) * 0.025;
+        } else {
+          bot.leftLegPivot.rotation.x *= 0.8;
+          bot.rightLegPivot.rotation.x *= 0.8;
+          bot.leftArmPivot.rotation.x *= 0.8;
+          bot.torso.position.y += (1.13 - bot.torso.position.y) * 0.2;
+        }
+        bot.rightArmPivot.rotation.x = -0.82;
+
+        if (hasLOS && dist < 55) {
+          bot.shootCooldown -= dt;
+          if (bot.shootCooldown <= 0) {
+            bot.shootCooldown = 0.65 + Math.random() * 0.5;
+            AudioFX.playShot(false);
+
+            var muzzleStart = botEyePos.clone().addScaledVector(forward, 0.55);
+            var hitChance = Math.max(0.18, 0.5 - dist * 0.006);
+            var shotDmg = Math.round(13 * bot.profile.damageMult);
+
+            if (Math.random() < hitChance) {
+              spawnTracer(muzzleStart, playerEyePos, bot.profile.hitColor);
+              damagePlayer(shotDmg);
+            } else {
+              var missPoint = playerEyePos.clone().add(
+                new THREE.Vector3((Math.random() - 0.5) * 2.2, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 2.2)
+              );
+              spawnTracer(muzzleStart, missPoint, bot.profile.hitColor);
+            }
+          }
+        }
+      });
+    }
+
+    renderMapPoolBadges();
+    selectPlayerAgent('JETT');
+    buildRandomOrSelectedMap('HAVEN');
+    applyWeaponVisuals(getEquippedWeaponKey());
+    applyCrosshairStyle(getCurrentPreset(), 0);
+    spawnAllBots();
+    updateHUD();
+    updateAbilityHUD();
+
+    var prevTime = performance.now();
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+
+      var dt = Math.min((now - prevTime) / 1000, 0.05);
+      prevTime = now;
+      var nowSeconds = now / 1000;
+
+      if (state.inMatch && !state.isPaused && !state.isShopOpen) {
+        ensureHudAndCrosshairVisible();
+
+        if (state.qCooldown > 0) state.qCooldown = Math.max(0, state.qCooldown - dt);
+        if (state.eCooldown > 0) state.eCooldown = Math.max(0, state.eCooldown - dt);
+        if (state.speedBuffTimer > 0) state.speedBuffTimer = Math.max(0, state.speedBuffTimer - dt);
+        updateAbilityHUD();
+
+        var turnSpeed = 2.2 * state.sensitivity * dt;
+        if (keys['ArrowLeft']) state.yaw += turnSpeed;
+        if (keys['ArrowRight']) state.yaw -= turnSpeed;
+        if (keys['ArrowUp']) state.pitch = Math.min(1.5, state.pitch + turnSpeed * 0.8);
+        if (keys['ArrowDown']) state.pitch = Math.max(-1.5, state.pitch - turnSpeed * 0.8);
+
+        var wPressed = isKeyPressed(['KeyW'], ['w']);
+        var sPressed = isKeyPressed(['KeyS'], ['s']);
+        var dPressed = isKeyPressed(['KeyD'], ['d']);
+        var aPressed = isKeyPressed(['KeyA'], ['a']);
+
+        state.isCrouching = isKeyPressed(['KeyC', 'ControlLeft'], ['c']);
+        state.isSprinting = !!(keys['ShiftLeft'] && !state.isCrouching && wPressed && !state.isScoped);
+
+        var targetHeight = state.isCrouching ? CROUCH_HEIGHT : STAND_HEIGHT;
+        state.currentEyeHeight += (targetHeight - state.currentEyeHeight) * Math.min(1, dt * 14);
+
+        var forward = new THREE.Vector3(-Math.sin(state.yaw), 0, -Math.cos(state.yaw));
+        var right = new THREE.Vector3(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
+        var wishDir = new THREE.Vector3();
+
+        if (wPressed) wishDir.add(forward);
+        if (sPressed) wishDir.sub(forward);
+        if (dPressed) wishDir.add(right);
+        if (aPressed) wishDir.sub(right);
+        if (wishDir.lengthSq() > 0) wishDir.normalize();
+
+        var playerAg = AGENT_PROFILES[state.selectedAgent];
+        var passiveMult = playerAg.name === 'NEON' ? 1.15 : (playerAg.name === 'JETT' ? 1.08 : 1.0);
+        var activeBuff = state.speedBuffTimer > 0 ? 1.45 : 1.0;
+        var scopeSlow = state.isScoped ? 0.72 : 1.0;
+        var moveSpeed = (state.isCrouching ? 3.8 : (state.isSprinting ? 9.2 : 6.4)) * passiveMult * activeBuff * scopeSlow;
+
+        state.velocity.x = wishDir.x * moveSpeed;
+        state.velocity.z = wishDir.z * moveSpeed;
+        state.velocity.y -= 20.0 * dt;
+
+        playerPos.x += state.velocity.x * dt;
+        playerPos.z += state.velocity.z * dt;
+        resolveHorizontalCollisions(playerPos, PLAYER_RADIUS, state.currentEyeHeight);
+
+        playerPos.y += state.velocity.y * dt;
+        resolveVerticalCollisions(playerPos, PLAYER_RADIUS, state.currentEyeHeight);
+
+        if (isMouseDown) {
+          fireWeapon(nowSeconds);
+        }
+
+        state.recoilPitch = Math.max(0, state.recoilPitch - dt * 0.095);
+        state.spread = Math.max(0, state.spread - dt * 0.085);
+
+        var horizSpeed = Math.hypot(state.velocity.x, state.velocity.z);
+        var dynGap = horizSpeed * 0.8 + state.spread * 200;
+        applyCrosshairStyle(getCurrentPreset(), dynGap);
+
+        if (horizSpeed > 0.5 && state.canJump) {
+          state.bobTimer += dt * (state.isSprinting ? 14 : 9);
+        }
+        var baseGunPos = state.isScoped ? gunAdsPos : gunRestPos;
+        var bobScale = state.isScoped ? 0.25 : 1.0;
+        var bobX = Math.cos(state.bobTimer) * 0.008 * bobScale;
+        var bobY = Math.abs(Math.sin(state.bobTimer)) * 0.008 * bobScale;
+        var reloadTilt = state.isReloading ? -0.45 : 0;
+
+        var activeWpnKey = getEquippedWeaponKey();
+        weaponGroup.visible = !!activeWpnKey && !(state.isScoped && activeWpnKey === 'PRIME_OPERATOR');
+        weaponGroup.position.x += (baseGunPos.x + bobX - weaponGroup.position.x) * Math.min(1, dt * 16);
+        weaponGroup.position.y += (baseGunPos.y - bobY - weaponGroup.position.y) * Math.min(1, dt * 16);
+        weaponGroup.position.z += (baseGunPos.z - weaponGroup.position.z) * Math.min(1, dt * 16);
+        weaponGroup.rotation.x += (reloadTilt - weaponGroup.rotation.x) * Math.min(1, dt * 12);
+        muzzleFlash.material.opacity = Math.max(0, muzzleFlash.material.opacity - dt * 18);
+
+        camera.position.set(playerPos.x, playerPos.y + state.currentEyeHeight, playerPos.z);
+        camera.rotation.y = state.yaw;
+        camera.rotation.x = Math.max(-1.5, Math.min(1.5, state.pitch + state.recoilPitch));
+
+        updateBots(dt);
+        drawMinimap();
+      }
+
+      for (var i = tracers.length - 1; i >= 0; i--) {
+        tracers[i].life -= dt;
+        if (tracers[i].life <= 0) {
+          scene.remove(tracers[i].line);
+          tracers[i].line.geometry.dispose();
+          tracers[i].line.material.dispose();
+          tracers.splice(i, 1);
+        }
+      }
+
+      for (var j = particles.length - 1; j >= 0; j--) {
+        var p = particles[j];
+        p.life -= dt;
+        p.vel.y -= 9.8 * dt;
+        p.mesh.position.addScaledVector(p.vel, dt);
+        if (p.life <= 0) {
+          scene.remove(p.mesh);
+          p.mesh.geometry.dispose();
+          p.mesh.material.dispose();
+          particles.splice(j, 1);
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    requestAnimationFrame(animate);
+  }());
+  </script>
+</body>
+</html>
